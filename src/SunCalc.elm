@@ -54,7 +54,9 @@ sunPosition date coords =
             sunCoords days
 
         hourAngle =
-            siderealTime days latitude - equatorialCoords.rightAscension
+            (-)
+                (siderealTime days latitude)
+                equatorialCoords.rightAscension
     in
         validateCoords coords
             { azimuth = azimuth hourAngle longitude equatorialCoords.declination
@@ -179,14 +181,19 @@ sunEclipticLatitude =
 -}
 toJulianDate : Date -> Float
 toJulianDate date =
-    Date.toTime date / msPerDay + julian1970
+    date
+        |> Date.toTime
+        |> flip (/) msPerDay
+        |> (+) julian1970
 
 
 {-| Converts [Julian date](https://en.wikipedia.org/wiki/Julian_day) to Gregorian date
 -}
 fromJulianDate : Float -> Date
 fromJulianDate julianDate =
-    Date.fromTime <| (julianDate - julian1970) * msPerDay
+    (julianDate - julian1970)
+        |> (*) msPerDay
+        |> Date.fromTime
 
 
 {-| Calculates amount of days since [Julian day number](https://en.wikipedia.org/wiki/Julian_day) for year 2000
@@ -204,35 +211,51 @@ daysSinceJulian2000 date =
 -}
 earthDeclination : Float -> Float -> Float
 earthDeclination eclipticLongitude eclipticLatitude =
-    asin <| sin eclipticLatitude * cos earthObliquity + cos eclipticLatitude * sin earthObliquity * sin eclipticLongitude
+    (sin eclipticLatitude * cos earthObliquity)
+        |> (+) (cos eclipticLatitude * sin earthObliquity * sin eclipticLongitude)
+        |> asin
 
 
 {-| Calculates [right ascension](https://en.wikipedia.org/wiki/Right_ascension) for Earth
 -}
 eartgRightAscension : Float -> Float -> Float
 eartgRightAscension eclipticLongitude eclipticLatitude =
-    atan2 (sin eclipticLongitude * cos earthObliquity - tan eclipticLatitude * sin earthObliquity) (cos eclipticLongitude)
+    atan2
+        ((-)
+            (sin eclipticLongitude * cos earthObliquity)
+            (tan eclipticLatitude * sin earthObliquity)
+        )
+        (cos eclipticLongitude)
 
 
 {-| Calculates [sidereal time](https://en.wikipedia.org/wiki/Sidereal_time) for Earth
 -}
 siderealTime : Float -> Float -> Float
 siderealTime days latitude =
-    degrees (earthSiderealTimeJulian2000 + earthSiderealTimeChangeRate * days) - latitude
+    (earthSiderealTimeJulian2000 + earthSiderealTimeChangeRate * days)
+        |> degrees
+        |> flip (-) latitude
 
 
 {-| Calculates [azimuth](https://en.wikipedia.org/wiki/Azimuth)
 -}
 azimuth : Float -> Float -> Float -> Float
 azimuth hourAngle longitude declination =
-    atan2 (sin hourAngle) (cos hourAngle * sin longitude - tan declination * cos longitude)
+    atan2
+        (sin hourAngle)
+        ((-)
+            (cos hourAngle * sin longitude)
+            (tan declination * cos longitude)
+        )
 
 
 {-| Calculates [altitude](https://en.wikipedia.org/wiki/Altitude)
 -}
 altitude : Float -> Float -> Float -> Float
 altitude hourAngle longitude declination =
-    asin <| sin longitude * sin declination + cos longitude * cos declination * cos hourAngle
+    (sin longitude * sin declination)
+        |> (+) (cos longitude * cos declination * cos hourAngle)
+        |> asin
 
 
 
@@ -243,28 +266,39 @@ altitude hourAngle longitude declination =
 -}
 earthSolarMeanAnomaly : Float -> Float
 earthSolarMeanAnomaly days =
-    degrees <| earthM0 + earthM1 * days
+    (earthM1 * days)
+        |> (+) earthM0
+        |> degrees
 
 
 {-| Calculates [equitation of center](https://en.wikipedia.org/wiki/Equation_of_the_center) for Earth
 -}
 earthEquationOfCenter : Float -> Float
 earthEquationOfCenter earthSMA =
-    degrees <| earthC1 * sin earthSMA + earthC2 * sin (2 * earthSMA) + earthC3 * sin (3 * earthSMA)
+    (earthC1 * sin earthSMA)
+        |> (+) (earthC2 * sin (2 * earthSMA))
+        |> (+) (earthC3 * sin (3 * earthSMA))
+        |> degrees
 
 
 {-| Calculates [ecliptic](https://en.wikipedia.org/wiki/Ecliptic_coordinate_system) longitude for Earth
 -}
 earthEclipticLongitude : Float -> Float
 earthEclipticLongitude earthSMA =
-    earthSMA + earthEquationOfCenter earthSMA + earthPerihelion + pi
+    earthSMA
+        + earthEquationOfCenter earthSMA
+        + earthPerihelion
+        + pi
 
 
 sunCoords : Float -> EquatorialCoordinated {}
 sunCoords days =
     let
+        earthSMA =
+            earthSolarMeanAnomaly days
+
         earthEL =
-            earthEclipticLongitude <| earthSolarMeanAnomaly days
+            earthEclipticLongitude earthSMA
     in
         { declination = earthDeclination earthEL sunEclipticLatitude
         , rightAscension = eartgRightAscension earthEL sunEclipticLatitude
