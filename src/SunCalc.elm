@@ -1,7 +1,12 @@
-module SunCalc exposing (sunPosition)
+module SunCalc exposing (sunPosition, Coordinated, Positioned)
 
 {-| This library provides functionality for calculating sun/moon position and light phases.
 This is a port of Vladimir Agafonkin's [SunCalc JavaScript library](https://github.com/mourner/suncalc)
+
+
+# Misc
+
+@docs Coordinated, Positioned
 
 
 # Sun
@@ -13,6 +18,22 @@ This is a port of Vladimir Agafonkin's [SunCalc JavaScript library](https://gith
 -- PUBLIC
 
 import Date exposing (Date)
+
+
+{-| -}
+type alias Coordinated a =
+    { a
+        | latitude : Float
+        , longitude : Float
+    }
+
+
+{-| -}
+type alias Positioned a =
+    { a
+        | azimuth : Float
+        , altitude : Float
+    }
 
 
 {-| Calculates sun position for given date, latitude and longitude
@@ -45,24 +66,11 @@ sunPosition date coords =
 -- PRIVATE
 
 
-type alias Coordinated a =
-    { a
-        | latitude : Float
-        , longitude : Float
-    }
-
-
+{-| -}
 type alias EquatorialCoordinated a =
     { a
         | declination : Float
         , rightAscension : Float
-    }
-
-
-type alias Positioned a =
-    { a
-        | azimuth : Float
-        , altitude : Float
     }
 
 
