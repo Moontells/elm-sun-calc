@@ -1,4 +1,7 @@
-module SunCalc exposing (sunPosition, Coordinated, Positioned)
+module SunCalc exposing
+    ( Coordinated, Positioned
+    , sunPosition
+    )
 
 {-| This library provides functionality for calculating sun/moon position and light phases.
 This is a port of Vladimir Agafonkin's [SunCalc JavaScript library](https://github.com/mourner/suncalc)
@@ -58,10 +61,10 @@ sunPosition date coords =
                 (siderealTime days latitude)
                 equatorialCoords.rightAscension
     in
-        validateCoords coords
-            { azimuth = azimuth hourAngle longitude equatorialCoords.declination
-            , altitude = altitude hourAngle longitude equatorialCoords.declination
-            }
+    validateCoords coords
+        { azimuth = azimuth hourAngle longitude equatorialCoords.declination
+        , altitude = altitude hourAngle longitude equatorialCoords.declination
+        }
 
 
 
@@ -183,7 +186,7 @@ toJulianDate : Date -> Float
 toJulianDate date =
     date
         |> Date.toTime
-        |> flip (/) msPerDay
+        |> (\a -> (/) a msPerDay)
         |> (+) julian1970
 
 
@@ -234,7 +237,7 @@ siderealTime : Float -> Float -> Float
 siderealTime days latitude =
     (earthSiderealTimeJulian2000 + earthSiderealTimeChangeRate * days)
         |> degrees
-        |> flip (-) latitude
+        |> (\a -> (-) a latitude)
 
 
 {-| Calculates [azimuth](https://en.wikipedia.org/wiki/Azimuth)
@@ -300,9 +303,9 @@ sunCoords days =
         earthEL =
             earthEclipticLongitude earthSMA
     in
-        { declination = earthDeclination earthEL sunEclipticLatitude
-        , rightAscension = eartgRightAscension earthEL sunEclipticLatitude
-        }
+    { declination = earthDeclination earthEL sunEclipticLatitude
+    , rightAscension = eartgRightAscension earthEL sunEclipticLatitude
+    }
 
 
 
@@ -317,7 +320,9 @@ validateCoords : Coordinated a -> b -> Result String b
 validateCoords { latitude, longitude } ok =
     if 90 < latitude || longitude < -90 then
         Err "Latitude is out of range. Latitude should be in range between -90 and 90"
+
     else if 180 < longitude || longitude < -180 then
         Err "Longitude is out of range"
+
     else
         Ok ok
