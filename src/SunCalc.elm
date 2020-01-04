@@ -57,9 +57,7 @@ sunPosition posix coords =
             sunCoords days
 
         hourAngle =
-            (-)
-                (siderealTime days latitude)
-                equatorialCoords.rightAscension
+            siderealTime days latitude - equatorialCoords.rightAscension
     in
     validateCoords coords
         { azimuth = azimuth hourAngle longitude equatorialCoords.declination
@@ -225,9 +223,8 @@ earthDeclination eclipticLongitude eclipticLatitude =
 eartgRightAscension : Float -> Float -> Float
 eartgRightAscension eclipticLongitude eclipticLatitude =
     atan2
-        ((-)
-            (sin eclipticLongitude * cos earthObliquity)
-            (tan eclipticLatitude * sin earthObliquity)
+        ((sin eclipticLongitude * cos earthObliquity)
+            - (tan eclipticLatitude * sin earthObliquity)
         )
         (cos eclipticLongitude)
 
@@ -238,7 +235,7 @@ siderealTime : Float -> Float -> Float
 siderealTime days latitude =
     (earthSiderealTimeJulian2000 + earthSiderealTimeChangeRate * days)
         |> degrees
-        |> (\a -> (-) a latitude)
+        |> (\a -> a - latitude)
 
 
 {-| Calculates [azimuth](https://en.wikipedia.org/wiki/Azimuth)
@@ -247,10 +244,7 @@ azimuth : Float -> Float -> Float -> Float
 azimuth hourAngle longitude declination =
     atan2
         (sin hourAngle)
-        ((-)
-            (cos hourAngle * sin longitude)
-            (tan declination * cos longitude)
-        )
+        ((cos hourAngle * sin longitude) - (tan declination * cos longitude))
 
 
 {-| Calculates [altitude](https://en.wikipedia.org/wiki/Altitude)
