@@ -20,7 +20,7 @@ This is a port of Vladimir Agafonkin's [SunCalc JavaScript library](https://gith
 
 -- PUBLIC
 
-import Date exposing (Date)
+import Time exposing (Posix)
 
 
 {-| -}
@@ -39,10 +39,10 @@ type alias Positioned a =
     }
 
 
-{-| Calculates sun position for given date, latitude and longitude
+{-| Calculates sun position for given time, latitude and longitude
 -}
-sunPosition : Date -> Coordinated a -> Result String (Positioned {})
-sunPosition date coords =
+sunPosition : Posix -> Coordinated a -> Result String (Positioned {})
+sunPosition posix coords =
     let
         latitude =
             degrees -coords.longitude
@@ -51,7 +51,7 @@ sunPosition date coords =
             degrees coords.latitude
 
         days =
-            daysSinceJulian2000 date
+            daysSinceJulian2000 posix
 
         equatorialCoords =
             sunCoords days
@@ -182,28 +182,29 @@ sunEclipticLatitude =
 
 {-| Converts date to [Julian date](https://en.wikipedia.org/wiki/Julian_day)
 -}
-toJulianDate : Date -> Float
-toJulianDate date =
-    date
-        |> Date.toTime
-        |> (\a -> (/) a msPerDay)
+toJulianDate : Posix -> Float
+toJulianDate posix =
+    posix
+        |> Time.posixToMillis
+        |> (\a -> toFloat a / msPerDay)
         |> (+) julian1970
 
 
 {-| Converts [Julian date](https://en.wikipedia.org/wiki/Julian_day) to Gregorian date
 -}
-fromJulianDate : Float -> Date
+fromJulianDate : Float -> Posix
 fromJulianDate julianDate =
     (julianDate - julian1970)
         |> (*) msPerDay
-        |> Date.fromTime
+        |> round
+        |> Time.millisToPosix
 
 
 {-| Calculates amount of days since [Julian day number](https://en.wikipedia.org/wiki/Julian_day) for year 2000
 -}
-daysSinceJulian2000 : Date -> Float
-daysSinceJulian2000 date =
-    toJulianDate date - julian2000
+daysSinceJulian2000 : Posix -> Float
+daysSinceJulian2000 posix =
+    toJulianDate posix - julian2000
 
 
 
