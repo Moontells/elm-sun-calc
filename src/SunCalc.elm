@@ -161,10 +161,9 @@ sunEclipticLatitude =
 -}
 toJulianDate : Posix -> Float
 toJulianDate posix =
-    posix
-        |> Time.posixToMillis
-        |> (\a -> toFloat a / msPerDay)
-        |> (+) julian1970
+    toFloat (Time.posixToMillis posix)
+        / msPerDay
+        + julian1970
 
 
 {-| Converts [Julian date](https://en.wikipedia.org/wiki/Julian_day) to Gregorian date
@@ -172,7 +171,7 @@ toJulianDate posix =
 fromJulianDate : Float -> Posix
 fromJulianDate julianDate =
     (julianDate - julian1970)
-        |> (*) msPerDay
+        * msPerDay
         |> round
         |> Time.millisToPosix
 
@@ -193,7 +192,7 @@ daysSinceJulian2000 posix =
 earthDeclination : Float -> Float -> Float
 earthDeclination eclipticLongitude eclipticLatitude =
     (sin eclipticLatitude * cos earthObliquity)
-        |> (+) (cos eclipticLatitude * sin earthObliquity * sin eclipticLongitude)
+        + (cos eclipticLatitude * sin earthObliquity * sin eclipticLongitude)
         |> asin
 
 
@@ -231,7 +230,7 @@ azimuth hourAngle longitude declination =
 altitude : Float -> Float -> Float -> Float
 altitude hourAngle longitude declination =
     (sin longitude * sin declination)
-        |> (+) (cos longitude * cos declination * cos hourAngle)
+        + (cos longitude * cos declination * cos hourAngle)
         |> asin
 
 
@@ -244,7 +243,7 @@ altitude hourAngle longitude declination =
 earthSolarMeanAnomaly : Float -> Float
 earthSolarMeanAnomaly days =
     (earthM1 * days)
-        |> (+) earthM0
+        + earthM0
         |> degrees
 
 
