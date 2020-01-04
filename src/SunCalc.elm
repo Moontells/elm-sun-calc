@@ -1,6 +1,7 @@
 module SunCalc exposing
     ( Coordinated, Positioned
     , sunPosition
+    , moonPosition
     )
 
 {-| This library provides functionality for calculating sun/moon position and light phases.
@@ -20,7 +21,7 @@ This is a port of Vladimir Agafonkin's [SunCalc JavaScript library](https://gith
 
 -- PUBLIC
 
-import Julian exposing (Days, Julian, unwrap)
+import Julian exposing (Days, unwrap)
 import Time exposing (Posix)
 
 
@@ -64,6 +65,45 @@ sunPosition posix coords =
     validateCoords coords
         { azimuth = azimuth hourAngle longitude equatorialCoords.declination
         , altitude = altitude hourAngle longitude equatorialCoords.declination
+        }
+
+
+moonPosition :
+    Posix
+    -> Coordinated a
+    -> Result String (Positioned { distance : Float, parallacticAngle : Float })
+moonPosition posix coords =
+    let
+        latitude =
+            degrees -coords.longitude
+
+        longitude =
+            degrees coords.latitude
+
+        days =
+            Julian.fromPosix posix
+                |> Julian.daysSince2000
+
+        equatorialCoords =
+            moonCoords days
+
+        hourAngle =
+            siderealTime days latitude - equatorialCoords.rightAscension
+
+        actualAltitude =
+            altitude hourAngle longitude equatorialCoords.declination
+
+        -- formula 14.1 of "Astronomical Algorithms" 2nd edition by Jean Meeus (Willmann-Bell, Richmond) 1998.
+        parallacticAngle =
+            atan2
+                (sin hourAngle)
+                (tan longitude * cos equatorialCoords.declination - sin equatorialCoords.declination * cos hourAngle)
+    in
+    validateCoords coords
+        { azimuth = azimuth hourAngle longitude equatorialCoords.declination
+        , altitude = actualAltitude + astroRefraction actualAltitude
+        , distance = equatorialCoords.distance
+        , parallacticAngle = parallacticAngle
         }
 
 
@@ -149,8 +189,8 @@ earthDeclination eclipticLongitude eclipticLatitude =
 
 {-| Calculates [right ascension](https://en.wikipedia.org/wiki/Right_ascension) for Earth
 -}
-eartgRightAscension : Float -> Float -> Float
-eartgRightAscension eclipticLongitude eclipticLatitude =
+earthRightAscension : Float -> Float -> Float
+earthRightAscension eclipticLongitude eclipticLatitude =
     atan2
         ((sin eclipticLongitude * cos earthObliquity)
             - (tan eclipticLatitude * sin earthObliquity)
@@ -245,8 +285,47 @@ sunCoords days =
             earthEclipticLongitude earthSMA
     in
     { declination = earthDeclination earthEL sunEclipticLatitude
-    , rightAscension = eartgRightAscension earthEL sunEclipticLatitude
+    , rightAscension = earthRightAscension earthEL sunEclipticLatitude
     }
+
+
+
+-- GENERAL MOON CALCULATIONS
+
+
+moonCoords : Days -> EquatorialCoordinated { distance : Float }
+moonCoords days =
+    let
+        eclipticLongitude =
+            (218.316 + 13.176396 * unwrap days) |> degrees
+
+        meanAnomaly =
+            (134.963 + 13.064993 * unwrap days) |> degrees
+
+        meanDistance =
+            (93.272 + 13.22935 * unwrap days) |> degrees
+
+        longitude =
+            eclipticLongitude + degrees 6.289 * sin meanAnomaly
+
+        latitude =
+            degrees 5.128 * sin meanDistance
+    in
+    { rightAscension = earthRightAscension longitude latitude
+    , declination = earthDeclination longitude latitude
+    , distance = 385001 - 20905 * cos meanAnomaly
+    }
+
+
+astroRefraction : Float -> Float
+astroRefraction alti =
+    -- The following formula works for positive altitudes only.
+    -- If h = -0.08901179 a div/0 would occur.
+    if alti < 0 then
+        astroRefraction 0
+
+    else
+        0.0002967 / tan (alti + 0.00312536 / (alti + 0.08901179))
 
 
 
