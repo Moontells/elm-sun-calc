@@ -20,6 +20,7 @@ This is a port of Vladimir Agafonkin's [SunCalc JavaScript library](https://gith
 
 -- PUBLIC
 
+import Julian exposing (Days, Julian, unwrap)
 import Time exposing (Posix)
 
 
@@ -51,7 +52,8 @@ sunPosition posix coords =
             degrees coords.latitude
 
         days =
-            daysSinceJulian2000 posix
+            Julian.fromPosix posix
+                |> Julian.daysSince2000
 
         equatorialCoords =
             sunCoords days
@@ -79,27 +81,6 @@ type alias EquatorialCoordinated a =
 
 
 -- CONSTANTS
-
-
-{-| Amount of milliseconds for a day
--}
-msPerDay : Float
-msPerDay =
-    1000 * 60 * 60 * 24
-
-
-{-| [Julian day number](https://en.wikipedia.org/wiki/Julian_day) for year 1970
--}
-julian1970 : Float
-julian1970 =
-    2440587.5
-
-
-{-| [Julian day number](https://en.wikipedia.org/wiki/Julian_day) for year 2000
--}
-julian2000 : Float
-julian2000 =
-    2451545
 
 
 {-| Earth [mean anomaly](https://en.wikipedia.org/wiki/Mean_anomaly)
@@ -154,36 +135,6 @@ sunEclipticLatitude =
 
 
 
--- CONVERSIONS
-
-
-{-| Converts date to [Julian date](https://en.wikipedia.org/wiki/Julian_day)
--}
-toJulianDate : Posix -> Float
-toJulianDate posix =
-    toFloat (Time.posixToMillis posix)
-        / msPerDay
-        + julian1970
-
-
-{-| Converts [Julian date](https://en.wikipedia.org/wiki/Julian_day) to Gregorian date
--}
-fromJulianDate : Float -> Posix
-fromJulianDate julianDate =
-    (julianDate - julian1970)
-        * msPerDay
-        |> round
-        |> Time.millisToPosix
-
-
-{-| Calculates amount of days since [Julian day number](https://en.wikipedia.org/wiki/Julian_day) for year 2000
--}
-daysSinceJulian2000 : Posix -> Float
-daysSinceJulian2000 posix =
-    toJulianDate posix - julian2000
-
-
-
 -- GENERAL CALCULATIONS FOR POSITION
 
 
@@ -209,9 +160,9 @@ eartgRightAscension eclipticLongitude eclipticLatitude =
 
 {-| Calculates [sidereal time](https://en.wikipedia.org/wiki/Sidereal_time) for Earth
 -}
-siderealTime : Float -> Float -> Float
+siderealTime : Days -> Float -> Float
 siderealTime days latitude =
-    (earthSiderealTimeJulian2000 + earthSiderealTimeChangeRate * days)
+    (earthSiderealTimeJulian2000 + earthSiderealTimeChangeRate * unwrap days)
         |> degrees
         |> (\a -> a - latitude)
 
@@ -240,9 +191,9 @@ altitude hourAngle longitude declination =
 
 {-| Calculates solar [mean anomaly](https://en.wikipedia.org/wiki/Mean_anomaly) for Earth in radians
 -}
-earthSolarMeanAnomaly : Float -> Float
+earthSolarMeanAnomaly : Days -> Float
 earthSolarMeanAnomaly days =
-    (earthM1 * days)
+    (earthM1 * unwrap days)
         + earthM0
         |> degrees
 
@@ -284,7 +235,7 @@ earthEclipticLongitude earthSMA =
         + pi
 
 
-sunCoords : Float -> EquatorialCoordinated {}
+sunCoords : Days -> EquatorialCoordinated {}
 sunCoords days =
     let
         earthSMA =
