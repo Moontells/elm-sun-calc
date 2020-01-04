@@ -117,27 +117,6 @@ earthM1 =
     0.98560028
 
 
-{-| First coefficient for calculation of equation of center for Earth
--}
-earthC1 : Float
-earthC1 =
-    1.9148
-
-
-{-| Second coefficient for calculation of equation of center for Earth
--}
-earthC2 : Float
-earthC2 =
-    0.02
-
-
-{-| Third coefficient for calculation of equation of center for Earth
--}
-earthC3 : Float
-earthC3 =
-    0.0003
-
-
 {-| [Perihelion](https://en.wikipedia.org/wiki/Perihelion_and_aphelion) for Earth
 -}
 earthPerihelion : Float
@@ -269,13 +248,30 @@ earthSolarMeanAnomaly days =
         |> degrees
 
 
-{-| Calculates [equitation of center](https://en.wikipedia.org/wiki/Equation_of_the_center) for Earth
+{-| Calculates [equation of the center](https://en.wikipedia.org/wiki/Equation_of_the_center) for Earth.
+The computation uses an approximation of the shape
+
+`C ≈ c1 sin(M) + c2 sin(2M) + c3 sin(3M)`
+
+where `M` is the Mean Anomaly and `ci` are constants, as given on this page
+[this page](https://www.aa.quae.nl/en/reken/zonpositie.html#3).
+
 -}
 earthEquationOfCenter : Float -> Float
 earthEquationOfCenter earthSMA =
-    (earthC1 * sin earthSMA)
-        |> (+) (earthC2 * sin (2 * earthSMA))
-        |> (+) (earthC3 * sin (3 * earthSMA))
+    let
+        c1 =
+            1.9148
+
+        c2 =
+            0.02
+
+        c3 =
+            0.0003
+    in
+    (c1 * sin earthSMA)
+        + (c2 * sin (2 * earthSMA))
+        + (c3 * sin (3 * earthSMA))
         |> degrees
 
 
