@@ -216,6 +216,7 @@ earthSiderealTimeChangeRate =
 
 {-| Distance in km between the earth and the sun
 -}
+earthSunDist : Float
 earthSunDist =
     149598000
 
