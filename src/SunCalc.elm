@@ -1,7 +1,7 @@
 module SunCalc exposing
     ( Coordinated, Positioned
     , sunPosition
-    , moonPosition
+    , MoonIllumination, moonIllumination, moonPosition
     )
 
 {-| This library provides functionality for calculating sun/moon position and light phases.
@@ -38,6 +38,14 @@ type alias Positioned a =
     { a
         | azimuth : Float
         , altitude : Float
+    }
+
+
+{-| -}
+type alias MoonIllumination =
+    { fraction : Float
+    , phase : Float
+    , angle : Float
     }
 
 
@@ -107,6 +115,45 @@ moonPosition posix coords =
         }
 
 
+moonIllumination : Posix -> MoonIllumination
+moonIllumination posix =
+    let
+        days =
+            Julian.fromPosix posix
+                |> Julian.daysSince2000
+
+        sun =
+            sunCoords days
+
+        moon =
+            moonCoords days
+
+        geocentricElongation =
+            acos (sin sun.declination * sin moon.declination + cos sun.declination * cos moon.declination * cos (sun.rightAscension - moon.rightAscension))
+
+        selenoCentricElongation =
+            atan2
+                (earthSunDist * sin geocentricElongation)
+                (moon.distance - earthSunDist * cos geocentricElongation)
+
+        angle =
+            atan2
+                (cos sun.declination * sin (sun.rightAscension - moon.rightAscension))
+                (sin sun.declination * cos moon.declination - cos sun.declination * sin moon.declination * cos (sun.rightAscension - moon.rightAscension))
+
+        upOrDown =
+            if angle < 0 then
+                -1
+
+            else
+                1
+    in
+    { fraction = (1 + cos selenoCentricElongation) / 2
+    , phase = 0.5 + 0.5 * selenoCentricElongation * upOrDown / pi
+    , angle = angle
+    }
+
+
 
 -- PRIVATE
 
@@ -165,6 +212,12 @@ earthSiderealTimeJulian2000 =
 earthSiderealTimeChangeRate : Float
 earthSiderealTimeChangeRate =
     360.9856235
+
+
+{-| Distance in km between the earth and the sun
+-}
+earthSunDist =
+    149598000
 
 
 {-| [Ecliptic]((https://en.wikipedia.org/wiki/Ecliptic_coordinate_system)) latitude for Sun
