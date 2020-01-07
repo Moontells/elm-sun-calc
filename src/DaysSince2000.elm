@@ -1,8 +1,7 @@
-module Julian exposing
-    ( Days
-    , Julian
-    , daysSince2000
+module DaysSince2000 exposing
+    ( DaysSince2000
     , fromPosix
+    , map
     , toPosix
     , unwrap
     )
@@ -10,13 +9,8 @@ module Julian exposing
 import Time exposing (Posix)
 
 
-{-| -}
-type Julian
-    = Julian Float
-
-
-type Days
-    = Days Float
+type DaysSince2000
+    = DaysSince2000 Float
 
 
 {-| Amount of milliseconds for a day
@@ -46,32 +40,31 @@ julian2000 =
 
 {-| Converts date to [Julian date](https://en.wikipedia.org/wiki/Julian_day)
 -}
-fromPosix : Posix -> Julian
+fromPosix : Posix -> DaysSince2000
 fromPosix posix =
     toFloat (Time.posixToMillis posix)
         / msPerDay
         + julian1970
-        |> Julian
+        - julian2000
+        |> DaysSince2000
 
 
 {-| Converts [Julian date](https://en.wikipedia.org/wiki/Julian_day) to Gregorian date
 -}
-toPosix : Julian -> Posix
-toPosix (Julian julianDate) =
-    (julianDate - julian1970)
+toPosix : DaysSince2000 -> Posix
+toPosix (DaysSince2000 days) =
+    (julian2000 + days - julian1970)
         * msPerDay
         |> round
         |> Time.millisToPosix
 
 
-{-| Calculates amount of days since [Julian day number](https://en.wikipedia.org/wiki/Julian_day) for year 2000
--}
-daysSince2000 : Julian -> Days
-daysSince2000 (Julian julianDate) =
-    Days (julianDate - julian2000)
-
-
 {-| -}
-unwrap : Days -> Float
-unwrap (Days days) =
+unwrap : DaysSince2000 -> Float
+unwrap (DaysSince2000 days) =
     days
+
+
+map : (Float -> Float) -> DaysSince2000 -> DaysSince2000
+map f (DaysSince2000 days) =
+    DaysSince2000 (f days)

@@ -21,7 +21,7 @@ This is a port of Vladimir Agafonkin's [SunCalc JavaScript library](https://gith
 
 -- PUBLIC
 
-import Julian exposing (Days, unwrap)
+import DaysSince2000 exposing (DaysSince2000, unwrap)
 import Time exposing (Posix)
 
 
@@ -61,8 +61,7 @@ sunPosition posix coords =
             degrees coords.latitude
 
         days =
-            Julian.fromPosix posix
-                |> Julian.daysSince2000
+            DaysSince2000.fromPosix posix
 
         equatorialCoords =
             sunCoords days
@@ -89,8 +88,7 @@ moonPosition posix coords =
             degrees coords.latitude
 
         days =
-            Julian.fromPosix posix
-                |> Julian.daysSince2000
+            DaysSince2000.fromPosix posix
 
         equatorialCoords =
             moonCoords days
@@ -119,8 +117,7 @@ moonIllumination : Posix -> MoonIllumination
 moonIllumination posix =
     let
         days =
-            Julian.fromPosix posix
-                |> Julian.daysSince2000
+            DaysSince2000.fromPosix posix
 
         sun =
             sunCoords days
@@ -254,7 +251,7 @@ earthRightAscension eclipticLongitude eclipticLatitude =
 
 {-| Calculates [sidereal time](https://en.wikipedia.org/wiki/Sidereal_time) for Earth
 -}
-siderealTime : Days -> Float -> Float
+siderealTime : DaysSince2000 -> Float -> Float
 siderealTime days latitude =
     (earthSiderealTimeJulian2000 + earthSiderealTimeChangeRate * unwrap days)
         |> degrees
@@ -285,7 +282,7 @@ altitude hourAngle longitude declination =
 
 {-| Calculates solar [mean anomaly](https://en.wikipedia.org/wiki/Mean_anomaly) for Earth in radians
 -}
-earthSolarMeanAnomaly : Days -> Float
+earthSolarMeanAnomaly : DaysSince2000 -> Float
 earthSolarMeanAnomaly days =
     (earthM1 * unwrap days)
         + earthM0
@@ -329,7 +326,7 @@ earthEclipticLongitude earthSMA =
         + pi
 
 
-sunCoords : Days -> EquatorialCoordinated {}
+sunCoords : DaysSince2000 -> EquatorialCoordinated {}
 sunCoords days =
     let
         earthSMA =
@@ -347,7 +344,7 @@ sunCoords days =
 -- GENERAL MOON CALCULATIONS
 
 
-moonCoords : Days -> EquatorialCoordinated { distance : Float }
+moonCoords : DaysSince2000 -> EquatorialCoordinated { distance : Float }
 moonCoords days =
     let
         eclipticLongitude =
