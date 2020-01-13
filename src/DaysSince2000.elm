@@ -2,6 +2,7 @@ module DaysSince2000 exposing
     ( DaysSince2000
     , fromPosix
     , map
+    , map2
     , toPosix
     , unwrap
     )
@@ -68,3 +69,8 @@ unwrap (DaysSince2000 days) =
 map : (Float -> Float) -> DaysSince2000 -> DaysSince2000
 map f (DaysSince2000 days) =
     DaysSince2000 (f days)
+
+
+map2 : (Float -> Float -> Float) -> DaysSince2000 -> DaysSince2000 -> DaysSince2000
+map2 f (DaysSince2000 days1) (DaysSince2000 days2) =
+    DaysSince2000 (f days1 days2)

@@ -1,7 +1,7 @@
 module SunCalc exposing
     ( Coordinated, Positioned
     , sunPosition
-    , MoonIllumination, moonIllumination, moonPosition
+    , MoonIllumination, moonIllumination, moonPosition, riseTime, setTime, sunrise, sunriseEnd, sunset, sunsetStart
     )
 
 {-| This library provides functionality for calculating sun/moon position and light phases.
@@ -149,6 +149,145 @@ moonIllumination posix =
     , phase = 0.5 + 0.5 * selenoCentricElongation * upOrDown / pi
     , angle = angle
     }
+
+
+{-| Constant needed for computation (what does it stand for???)
+-}
+j0 : Float
+j0 =
+    0.0009
+
+
+type RiseSet
+    = Rise
+    | Set
+
+
+time : RiseSet -> Float -> Posix -> Coordinated a -> Float -> Posix
+time riseSet angle posix coords height =
+    let
+        latitude =
+            degrees -coords.longitude
+
+        longitude =
+            degrees coords.latitude
+
+        days =
+            DaysSince2000.fromPosix posix
+
+        observerAngle =
+            -2.076 * sqrt height / 60
+
+        julianCycle =
+            days
+                |> DaysSince2000.map
+                    (\ds ->
+                        round (ds - j0 - latitude / (2 * pi))
+                            |> toFloat
+                    )
+
+        approxTransit =
+            computeApproxTransit 0 latitude julianCycle
+
+        solarMeanAnomaly =
+            earthSolarMeanAnomaly approxTransit
+
+        eclipticLongitude =
+            earthEclipticLongitude solarMeanAnomaly
+
+        declination =
+            earthDeclination eclipticLongitude 0
+
+        noon =
+            solarTransit approxTransit solarMeanAnomaly eclipticLongitude
+
+        actualAngle =
+            degrees (angle + observerAngle)
+
+        hourAngle =
+            acos
+                ((sin actualAngle - sin longitude * sin declination)
+                    / (cos longitude * cos declination)
+                )
+
+        set =
+            solarTransit
+                (computeApproxTransit hourAngle latitude julianCycle)
+                solarMeanAnomaly
+                eclipticLongitude
+    in
+    case riseSet of
+        Set ->
+            DaysSince2000.toPosix set
+
+        Rise ->
+            DaysSince2000.map2
+                (\dsSet dsNoon ->
+                    2 * dsNoon - dsSet
+                )
+                set
+                noon
+                |> DaysSince2000.toPosix
+
+
+solarTransit : DaysSince2000 -> Float -> Float -> DaysSince2000
+solarTransit days solarMeanAnomaly eclipticLongitude =
+    days
+        |> DaysSince2000.map
+            (\ds ->
+                ds + 0.0053 * sin solarMeanAnomaly - 0.0069 * sin (2 * eclipticLongitude)
+            )
+
+
+computeApproxTransit : Float -> Float -> DaysSince2000 -> DaysSince2000
+computeApproxTransit hourAngle longitude julianCycle =
+    julianCycle
+        |> DaysSince2000.map
+            (\ds ->
+                j0 + (hourAngle + longitude) / (2 * pi) + ds
+            )
+
+
+setTime : Float -> Posix -> Coordinated a -> Result String Posix
+setTime angle posix coords =
+    validateCoords coords
+        (time Set angle posix coords 0)
+
+
+riseTime : Float -> Posix -> Coordinated a -> Result String Posix
+riseTime angle posix coords =
+    validateCoords coords
+        (time Rise angle posix coords 0)
+
+
+sunriseSetAngle : Float
+sunriseSetAngle =
+    -0.833
+
+
+sunrise : Posix -> Coordinated a -> Result String Posix
+sunrise =
+    riseTime sunriseSetAngle
+
+
+sunset : Posix -> Coordinated a -> Result String Posix
+sunset =
+    setTime sunriseSetAngle
+
+
+sunriseSetEndAngle : Float
+sunriseSetEndAngle =
+    -0.3
+
+
+sunriseEnd : Posix -> Coordinated a -> Result String Posix
+sunriseEnd =
+    riseTime sunriseSetEndAngle
+
+
+sunsetStart : Posix -> Coordinated a -> Result String Posix
+sunsetStart =
+    setTime sunriseSetEndAngle
 
 
 
