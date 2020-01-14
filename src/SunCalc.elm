@@ -53,7 +53,7 @@ type alias Positioned a =
 
 {-| Calculates sun position for given time, latitude and longitude
 -}
-sunPosition : Posix -> Coordinated a -> Result String (Positioned {})
+sunPosition : Posix -> Coordinated a -> Positioned {}
 sunPosition posix coords =
     let
         latitude =
@@ -71,10 +71,9 @@ sunPosition posix coords =
         hourAngle =
             siderealTime days latitude - equatorialCoords.rightAscension
     in
-    validateCoords coords
-        { azimuth = azimuth hourAngle longitude equatorialCoords.declination
-        , altitude = altitude hourAngle longitude equatorialCoords.declination
-        }
+    { azimuth = azimuth hourAngle longitude equatorialCoords.declination
+    , altitude = altitude hourAngle longitude equatorialCoords.declination
+    }
 
 
 {-| Calculates solar [mean anomaly](https://en.wikipedia.org/wiki/Mean_anomaly) for Earth in radians
@@ -152,10 +151,9 @@ Example:
 Use [sunset](#sunset) or [sunsetStart](#sunsetStart) for predefined angles.
 
 -}
-setTime : Float -> Posix -> Coordinated a -> Result String Posix
+setTime : Float -> Posix -> Coordinated a -> Posix
 setTime angle posix coords =
-    validateCoords coords
-        (time Set angle posix coords 0)
+    time Set angle posix coords 0
 
 
 {-| Computes the time where the sun passes at a given angle in the morning.
@@ -169,10 +167,9 @@ Example:
 Use [sunrise](#sunrise) or [sunriseEnd](#sunsetStart) for predefined angles.
 
 -}
-riseTime : Float -> Posix -> Coordinated a -> Result String Posix
+riseTime : Float -> Posix -> Coordinated a -> Posix
 riseTime angle posix coords =
-    validateCoords coords
-        (time Rise angle posix coords 0)
+    time Rise angle posix coords 0
 
 
 sunriseSetAngle : Float
@@ -182,14 +179,14 @@ sunriseSetAngle =
 
 {-| Computes the time for the sunrise. See also [setTime](#setTime).
 -}
-sunrise : Posix -> Coordinated a -> Result String Posix
+sunrise : Posix -> Coordinated a -> Posix
 sunrise =
     riseTime sunriseSetAngle
 
 
 {-| Computes the time for the sunset. See also [riseTime](#riseTime).
 -}
-sunset : Posix -> Coordinated a -> Result String Posix
+sunset : Posix -> Coordinated a -> Posix
 sunset =
     setTime sunriseSetAngle
 
@@ -201,14 +198,14 @@ sunriseSetEndAngle =
 
 {-| Computes the time for the end of the sunrise. See also [riseTime](#riseTime).
 -}
-sunriseEnd : Posix -> Coordinated a -> Result String Posix
+sunriseEnd : Posix -> Coordinated a -> Posix
 sunriseEnd =
     riseTime sunriseSetEndAngle
 
 
 {-| Computes the time for the begning of the sunset. See also [setTime](#setTime).
 -}
-sunsetStart : Posix -> Coordinated a -> Result String Posix
+sunsetStart : Posix -> Coordinated a -> Posix
 sunsetStart =
     setTime sunriseSetEndAngle
 
@@ -319,7 +316,7 @@ computeApproxTransit hourAngle longitude julianCycle =
 moonPosition :
     Posix
     -> Coordinated a
-    -> Result String (Positioned { distance : Float, parallacticAngle : Float })
+    -> Positioned { distance : Float, parallacticAngle : Float }
 moonPosition posix coords =
     let
         latitude =
@@ -346,12 +343,11 @@ moonPosition posix coords =
                 (sin hourAngle)
                 (tan longitude * cos equatorialCoords.declination - sin equatorialCoords.declination * cos hourAngle)
     in
-    validateCoords coords
-        { azimuth = azimuth hourAngle longitude equatorialCoords.declination
-        , altitude = actualAltitude + astroRefraction actualAltitude
-        , distance = equatorialCoords.distance
-        , parallacticAngle = parallacticAngle
-        }
+    { azimuth = azimuth hourAngle longitude equatorialCoords.declination
+    , altitude = actualAltitude + astroRefraction actualAltitude
+    , distance = equatorialCoords.distance
+    , parallacticAngle = parallacticAngle
+    }
 
 
 {-| -}
@@ -460,7 +456,7 @@ type MoonTimes
 {-| Computes the times of rise and set (if any) at the day given by
 the `Posix` and `Zone` argument.
 -}
-moonTimes : Time.Zone -> Posix -> Coordinated {} -> Result String MoonTimes
+moonTimes : Time.Zone -> Posix -> Coordinated {} -> MoonTimes
 moonTimes zone posix coords =
     let
         midnight =
@@ -471,7 +467,6 @@ moonTimes zone posix coords =
     in
     loopCrossHorizon 1 midnight coords (CrossResult Nothing Nothing)
         |> toMoonTimes initialHeight midnight
-        |> validateCoords coords
 
 
 loopCrossHorizon : Int -> Posix -> Coordinated {} -> CrossResult -> CrossResult
@@ -498,8 +493,7 @@ loopCrossHorizon offset midnight coords currentResult =
 moonAltitude : Posix -> Coordinated {} -> Float
 moonAltitude date coords =
     moonPosition date coords
-        |> Result.map .altitude
-        |> Result.withDefault 0
+        |> .altitude
         -- altitude correction (why ???)
         |> (-) (degrees 0.133)
 
@@ -734,23 +728,3 @@ earthSunDist =
 sunEclipticLatitude : Float
 sunEclipticLatitude =
     0
-
-
-
--- VALIDATIONS
-
-
-{-| Validates coordinates.
-Latitude range is between -90° and 90°.
-Longitude range is between -180° and 180°.
--}
-validateCoords : Coordinated a -> b -> Result String b
-validateCoords { latitude, longitude } ok =
-    if 90 < latitude || longitude < -90 then
-        Err "Latitude is out of range. Latitude should be in range between -90 and 90"
-
-    else if 180 < longitude || longitude < -180 then
-        Err "Longitude is out of range"
-
-    else
-        Ok ok
