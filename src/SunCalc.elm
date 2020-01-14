@@ -2,6 +2,7 @@ module SunCalc exposing
     ( Coordinated, Positioned
     , sunPosition, riseTime, setTime, sunrise, sunriseEnd, sunset, sunsetStart
     , MoonIllumination, moonIllumination, moonPosition
+    , moonTimes
     )
 
 {-| This library provides functionality for calculating sun/moon position and light phases.
@@ -26,6 +27,7 @@ This is a port of Vladimir Agafonkin's [SunCalc JavaScript library](https://gith
 
 import DaysSince2000 exposing (DaysSince2000, unwrap)
 import Time exposing (Posix)
+import Time.Extra
 
 
 {-| -}
@@ -439,6 +441,177 @@ astroRefraction alti =
 
     else
         0.0002967 / tan (alti + 0.00312536 / (alti + 0.08901179))
+
+
+
+-- MOON TIMES COMPUTATIONS
+
+
+type MoonTimes
+    = RiseAt Posix
+    | SetAt Posix
+    | RiseAndSetAt Posix Posix
+    | AlwaysUp
+    | AlwaysDown
+
+
+moonTimes : Time.Zone -> Posix -> Coordinated {} -> Result String MoonTimes
+moonTimes zone posix coords =
+    let
+        midnight =
+            Time.Extra.startOfDay zone posix
+
+        initialHeight =
+            moonAltitude midnight coords
+    in
+    loopCrossHorizon 1 midnight coords (CrossResult Nothing Nothing)
+        |> toMoonTimes initialHeight midnight
+        |> validateCoords coords
+
+
+loopCrossHorizon : Int -> Posix -> Coordinated {} -> CrossResult -> CrossResult
+loopCrossHorizon offset midnight coords currentResult =
+    if offset > 24 then
+        currentResult
+
+    else
+        let
+            newResult =
+                crossHorizon (toFloat offset)
+                    (moonAltitude (Time.Extra.addHours (offset - 1) midnight) coords)
+                    (moonAltitude (Time.Extra.addHours offset midnight) coords)
+                    (moonAltitude (Time.Extra.addHours (offset + 1) midnight) coords)
+                    currentResult
+        in
+        if isEnded newResult then
+            currentResult
+
+        else
+            loopCrossHorizon (offset + 2) midnight coords newResult
+
+
+moonAltitude : Posix -> Coordinated {} -> Float
+moonAltitude date coords =
+    moonPosition date coords
+        |> Result.map .altitude
+        |> Result.withDefault 0
+        |> (-) (degrees 0.133)
+
+
+
+-- altitude correction (why ???)
+
+
+type alias CrossResult =
+    { riseOffset : Maybe Float
+    , setOffset : Maybe Float
+    }
+
+
+crossHorizon : Float -> Float -> Float -> Float -> CrossResult -> CrossResult
+crossHorizon offset altBefore altCurrent altAfter currentResult =
+    let
+        a =
+            (altBefore + altAfter) / 2 - altCurrent
+
+        b =
+            (altAfter - altBefore) / 2
+
+        xe =
+            -b / (2 * a)
+
+        ye =
+            (a * xe + b) * xe + altCurrent
+
+        delta =
+            b * b - 4 * a * altCurrent
+    in
+    if delta < 0 then
+        currentResult
+
+    else
+        let
+            dx =
+                sqrt delta / (abs a * 2)
+
+            x1 =
+                xe - dx
+
+            x2 =
+                xe + dx
+
+            nbRoots =
+                (if abs x1 <= 1 then
+                    1
+
+                 else
+                    0
+                )
+                    + (if abs x2 <= 1 then
+                        1
+
+                       else
+                        0
+                      )
+        in
+        case nbRoots of
+            1 ->
+                if altBefore < 0 then
+                    { currentResult | riseOffset = Just <| offset + x1 }
+
+                else
+                    { currentResult | setOffset = Just <| offset + x1 }
+
+            2 ->
+                if ye < 0 then
+                    { riseOffset = Just <| offset + x2
+                    , setOffset = Just <| offset + x1
+                    }
+
+                else
+                    { riseOffset = Just <| offset + x1
+                    , setOffset = Just <| offset + x2
+                    }
+
+            _ ->
+                currentResult
+
+
+isEnded : CrossResult -> Bool
+isEnded { riseOffset, setOffset } =
+    riseOffset /= Nothing && setOffset /= Nothing
+
+
+toMoonTimes : Float -> Posix -> CrossResult -> MoonTimes
+toMoonTimes height midnight { riseOffset, setOffset } =
+    case ( riseOffset, setOffset ) of
+        ( Nothing, Nothing ) ->
+            if height > 0 then
+                AlwaysUp
+
+            else
+                AlwaysDown
+
+        ( Nothing, Just s ) ->
+            SetAt <|
+                addHours s midnight
+
+        ( Just r, Nothing ) ->
+            RiseAt <|
+                addHours r midnight
+
+        ( Just r, Just s ) ->
+            RiseAndSetAt
+                (addHours r midnight)
+                (addHours s midnight)
+
+
+addHours : Float -> Posix -> Posix
+addHours dt posix =
+    posix
+        |> Time.posixToMillis
+        |> (+) (round <| dt * 3600000)
+        |> Time.millisToPosix
 
 
 
