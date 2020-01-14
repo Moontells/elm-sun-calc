@@ -484,7 +484,7 @@ loopCrossHorizon offset midnight coords currentResult =
                     currentResult
         in
         if isEnded newResult then
-            currentResult
+            newResult
 
         else
             loopCrossHorizon (offset + 2) midnight coords newResult
@@ -534,14 +534,14 @@ crossHorizon offset altBefore altCurrent altAfter currentResult =
             dx =
                 sqrt delta / (abs a * 2)
 
-            x1 =
+            x1_ =
                 xe - dx
 
             x2 =
                 xe + dx
 
             nbRoots =
-                (if abs x1 <= 1 then
+                (if abs x1_ <= 1 then
                     1
 
                  else
@@ -553,6 +553,13 @@ crossHorizon offset altBefore altCurrent altAfter currentResult =
                        else
                         0
                       )
+
+            x1 =
+                if x1_ < -1 then
+                    x2
+
+                else
+                    x1_
         in
         case nbRoots of
             1 ->
