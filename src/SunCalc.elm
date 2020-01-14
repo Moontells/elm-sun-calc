@@ -1,12 +1,13 @@
 module SunCalc exposing
     ( Coordinated, Positioned
     , sunPosition, riseTime, setTime, sunrise, sunriseEnd, sunset, sunsetStart
-    , MoonIllumination, moonIllumination, moonPosition
-    , moonTimes
+    , MoonIllumination, moonIllumination, moonPosition, MoonTimes(..), moonTimes
     )
 
 {-| This library provides functionality for calculating sun/moon position and light phases.
 This is a port of Vladimir Agafonkin's [SunCalc JavaScript library](https://github.com/mourner/suncalc)
+
+The `Posix` and `Zone` types are the ones defined in [elm/time](https://package.elm-lang.org/packages/elm/time/latest).
 
 
 # Coordinates systems
@@ -21,7 +22,7 @@ This is a port of Vladimir Agafonkin's [SunCalc JavaScript library](https://gith
 
 # Moon
 
-@docs MoonIllumination, moonIllumination, moonPosition
+@docs MoonIllumination, moonIllumination, moonPosition, MoonTimes, moonTimes
 
 -}
 
@@ -447,6 +448,7 @@ astroRefraction alti =
 -- MOON TIMES COMPUTATIONS
 
 
+{-| -}
 type MoonTimes
     = RiseAt Posix
     | SetAt Posix
@@ -455,6 +457,9 @@ type MoonTimes
     | AlwaysDown
 
 
+{-| Computes the times of rise and set (if any) at the day given by
+the `Posix` and `Zone` argument.
+-}
 moonTimes : Time.Zone -> Posix -> Coordinated {} -> Result String MoonTimes
 moonTimes zone posix coords =
     let
@@ -495,11 +500,8 @@ moonAltitude date coords =
     moonPosition date coords
         |> Result.map .altitude
         |> Result.withDefault 0
+        -- altitude correction (why ???)
         |> (-) (degrees 0.133)
-
-
-
--- altitude correction (why ???)
 
 
 type alias CrossResult =
