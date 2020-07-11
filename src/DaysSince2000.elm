@@ -1,10 +1,13 @@
 module DaysSince2000 exposing
-    ( DaysSince2000
+    ( DaysSince2000(..)
     , fromPosix
     , map
     , map2
     , toPosix
     , unwrap
+    , dayStart
+    , shift
+    , diff
     )
 
 import Time exposing (Posix)
@@ -74,3 +77,16 @@ map f (DaysSince2000 days) =
 map2 : (Float -> Float -> Float) -> DaysSince2000 -> DaysSince2000 -> DaysSince2000
 map2 f (DaysSince2000 days1) (DaysSince2000 days2) =
     DaysSince2000 (f days1 days2)
+
+
+-- DAYS MANIPULATIONS
+
+
+dayStart : DaysSince2000 -> DaysSince2000
+dayStart (DaysSince2000 days) = DaysSince2000 (floor days |> toFloat)
+
+shift : DaysSince2000 -> Int -> DaysSince2000
+shift (DaysSince2000 days) = toFloat >> (+) days >> DaysSince2000
+
+diff : DaysSince2000 -> DaysSince2000 -> Float
+diff (DaysSince2000 d1) (DaysSince2000 d2) = d2 - d1
