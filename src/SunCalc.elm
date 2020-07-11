@@ -1,7 +1,8 @@
 module SunCalc exposing
     ( Coordinated, Positioned
     , sunPosition, riseTime, setTime, sunrise, sunriseEnd, sunset, sunsetStart
-    , MoonIllumination, moonIllumination, moonPosition, MoonTimes(..), moonTimes
+    , MoonIllumination, moonIllumination, moonIlluminationByDays,  moonPosition
+    , MoonTimes(..), moonTimes
     )
 
 {-| This library provides functionality for calculating sun/moon position and light phases.
@@ -360,12 +361,13 @@ type alias MoonIllumination =
 
 {-| Compute moon illumination at a given time
 -}
-moonIllumination : Posix -> MoonIllumination
-moonIllumination posix =
-    let
-        days =
-            DaysSince2000.fromPosix posix
 
+moonIllumination : Posix -> MoonIllumination
+moonIllumination = moonIlluminationByDays << DaysSince2000.fromPosix
+
+moonIlluminationByDays : DaysSince2000 -> MoonIllumination
+moonIlluminationByDays days =
+    let
         sun =
             sunCoords days
 
