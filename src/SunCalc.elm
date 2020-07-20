@@ -30,7 +30,8 @@ The `Posix` and `Zone` types are the ones defined in [elm/time](https://package.
 
 import DaysSince2000 exposing (DaysSince2000, unwrap)
 import Time exposing (Posix)
-import Time.Extra
+
+import TimeUtils exposing (startOfDay, addHours)
 
 
 {-| -}
@@ -467,17 +468,17 @@ moonTimes : Time.Zone -> Posix -> Coordinated {} -> MoonTimes
 moonTimes zone posix coords =
     let
         midnight =
-            Time.Extra.startOfDay zone posix
+            startOfDay zone posix
 
         initialHeight =
             moonAltitude midnight coords
     in
-    loopCrossHorizon 1 midnight coords (CrossResult Nothing Nothing)
+    loopCrossHorizon 1 zone midnight coords (CrossResult Nothing Nothing)
         |> toMoonTimes initialHeight midnight
 
 
-loopCrossHorizon : Int -> Posix -> Coordinated {} -> CrossResult -> CrossResult
-loopCrossHorizon offset midnight coords currentResult =
+loopCrossHorizon : Int -> Time.Zone -> Posix -> Coordinated {} -> CrossResult -> CrossResult
+loopCrossHorizon offset zone midnight coords currentResult =
     if offset > 24 then
         currentResult
 
@@ -485,16 +486,16 @@ loopCrossHorizon offset midnight coords currentResult =
         let
             newResult =
                 crossHorizon (toFloat offset)
-                    (moonAltitude (Time.Extra.addHours (offset - 1) midnight) coords)
-                    (moonAltitude (Time.Extra.addHours offset midnight) coords)
-                    (moonAltitude (Time.Extra.addHours (offset + 1) midnight) coords)
+                    (moonAltitude (addHours (offset - 1) zone midnight) coords)
+                    (moonAltitude (addHours offset zone midnight) coords)
+                    (moonAltitude (addHours (offset + 1) zone midnight) coords)
                     currentResult
         in
         if isEnded newResult then
             newResult
 
         else
-            loopCrossHorizon (offset + 2) midnight coords newResult
+            loopCrossHorizon (offset + 2) zone midnight coords newResult
 
 
 moonAltitude : Posix -> Coordinated {} -> Float
@@ -604,20 +605,21 @@ toMoonTimes height midnight { riseOffset, setOffset } =
 
         ( Nothing, Just s ) ->
             SetAt <|
-                addHours s midnight
+                addFloatHours s midnight
 
         ( Just r, Nothing ) ->
             RiseAt <|
-                addHours r midnight
+                addFloatHours r midnight
 
         ( Just r, Just s ) ->
             RiseAndSetAt
-                (addHours r midnight)
-                (addHours s midnight)
+                (addFloatHours r midnight)
+                (addFloatHours s midnight)
 
 
-addHours : Float -> Posix -> Posix
-addHours dt posix =
+-- TODO replace it with function from library
+addFloatHours : Float -> Posix -> Posix
+addFloatHours dt posix =
     posix
         |> Time.posixToMillis
         |> (+) (round <| dt * 3600000)
