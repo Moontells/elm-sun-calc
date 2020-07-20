@@ -1,6 +1,6 @@
 module Moon exposing (..)
 
-import Time exposing (Posix)
+import Time exposing (Posix, posixToMillis, millisToPosix)
 import TimeUtils exposing (..)
 
 import List exposing (map, range, indexedMap)
@@ -36,11 +36,29 @@ startOfLunarMonth zone startTime =
                     iterate (Just new_phase) <| previousDay zone time
                 Just phase ->
                     if new_phase > phase
-                    then time
+                    then binsearchNewMoon time (nextDay zone time)
                     else
                         iterate (Just new_phase) <| previousDay zone time
     in
         iterate Nothing startTime
+
+
+binsearchNewMoon : Posix -> Posix -> Posix
+binsearchNewMoon left right =
+    let
+        offsetToPosix = floor >> (+) (posixToMillis left) >> millisToPosix
+        phase = offsetToPosix >> moonIllumination >> .phase
+        search i l r = 
+            let
+                m = (l+r)/2
+            in if i <= 0
+            then m
+            else if phase m > 0.5
+               then search (i-1) m r
+               else search (i-1) l m
+        startOffset = (posixToMillis right) - (posixToMillis left) |> toFloat
+    in 
+        search 20 0 startOffset |> offsetToPosix -- 20 iterations give subsecond precision
 
 
 lunarDaysByPeriod : Time.Zone -> Coordinated {} -> Posix -> Posix -> List MoonDayInfo

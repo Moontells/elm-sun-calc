@@ -9,6 +9,7 @@ addHours   = add Hour
 addMinutes = add Minute
 
 previousDay = add Day -1
+nextDay     = add Day 1
 
 halfMonthBack    = add Day -15
 halfMonthForward = add Day  15
