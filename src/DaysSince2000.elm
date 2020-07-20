@@ -8,6 +8,7 @@ module DaysSince2000 exposing
     , dayStart
     , shift
     , diff
+    , defaultTime
     )
 
 import Time exposing (Posix)
@@ -90,3 +91,7 @@ shift (DaysSince2000 days) = toFloat >> (+) days >> DaysSince2000
 
 diff : DaysSince2000 -> DaysSince2000 -> Float
 diff (DaysSince2000 d1) (DaysSince2000 d2) = d2 - d1
+
+
+defaultTime : Posix
+defaultTime = DaysSince2000 0 |> toPosix

@@ -3,7 +3,7 @@ module SunCalc exposing
     , sunPosition, riseTime, setTime, sunrise, sunriseEnd, sunset, sunsetStart
     , MoonIllumination, moonIllumination, moonIlluminationByDays,  moonPosition
     , MoonTimes(..), moonTimes
-    , moonDay
+    , CrossResult, crossHorizon, moonAltitude, addFloatHours
     )
 
 {-| This library provides functionality for calculating sun/moon position and light phases.
@@ -400,10 +400,6 @@ moonIlluminationByDays days =
     , phase = 0.5 + 0.5 * selenoCentricElongation * upOrDown / pi
     , angle = angle
     }
-
-
-moonDay : MoonIllumination -> Int
-moonDay illum = 1 + illum.phase * 29 |> floor
 
 
 type alias EquatorialCoordinated a =

@@ -3,16 +3,26 @@ module TimeUtils exposing (..)
 import Time exposing (Posix)
 import Time.Extra exposing (Interval(..), add, diff, floor, ceiling)
 
-
 startOfDay = Time.Extra.floor Day
 endOfDay   = Time.Extra.ceiling Day
 addHours   = add Hour
+addMinutes = add Minute
 
-hourIntervals : Time.Zone -> Posix -> Posix -> List Posix
-hourIntervals zone start end =
+previousDay = add Day -1
+
+halfMonthBack    = add Day -15
+halfMonthForward = add Day  15
+
+intervals : Interval -> Time.Zone -> Posix -> Posix -> List Posix
+intervals interval zone start end =
     let
         startDay = startOfDay zone start
         endDay   = endOfDay zone end
-        totalHours = diff Hour zone startDay endDay
+        total    = diff interval zone startDay endDay
     in
-        List.map (\i -> add Hour i zone startDay) <| List.range 0 totalHours
+        List.map (\i -> add interval i zone startDay) <| List.range 0 total
+
+hourIntervals = intervals Hour
+dayIntervals  = intervals Day
+
+
