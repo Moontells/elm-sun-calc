@@ -127,6 +127,14 @@ type alias PosixCrossResult =
     , setTime  : Maybe Posix
     }
 
+type alias LunarDay a b =
+    { start  : a
+    , end    : a
+    , rise   : a
+    , set    : a
+    , day    : b
+    }
+
 
 baseAt : Posix -> CrossResult -> PosixCrossResult
 baseAt posix cross =
