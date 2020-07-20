@@ -64,8 +64,8 @@ binsearchNewMoon left right =
 lunarDaysByPeriod : Time.Zone -> Coordinated {} -> Posix -> Posix -> List MoonDayInfo
 lunarDaysByPeriod zone coord start end =
     let 
-        new_start = startOfLunarMonth zone start
-        hours = hourIntervals zone new_start end
+        lunar_beginning = startOfLunarMonth zone start
+        hours = hourIntervals zone lunar_beginning end
         calcCrossHorizon time =
             crossHorizon 0
                     (moonAltitude (addMinutes -30 zone time) coord)
@@ -73,7 +73,12 @@ lunarDaysByPeriod zone coord start end =
                     (moonAltitude (addMinutes 30 zone time) coord)
                     (CrossResult Nothing Nothing) |> baseAt time
     in
-        map calcCrossHorizon hours |> List.reverse |> composeToLunarDays |> indexedMap toMoonDay
+        map calcCrossHorizon hours
+            |> List.reverse
+            |> composeToLunarDays
+            |> insertBeginningOfLunarMonth lunar_beginning
+            |> List.filter (not << isNothing)
+            |> indexedMap toMoonDay
 
 
 composeToLunarDays : List PosixCrossResult -> List PosixCrossResult
@@ -87,7 +92,13 @@ composeToLunarDays crosses =
                     iterate remaining <| batch current collected
     in
         iterate crosses []
-        
+
+insertBeginningOfLunarMonth : Posix -> List PosixCrossResult -> List PosixCrossResult
+insertBeginningOfLunarMonth beginning lunarDays =
+    case lunarDays of
+        [] -> []
+        firstDay :: remaining ->
+            { firstDay | riseTime = Just beginning } :: remaining
 
 batch : PosixCrossResult -> List PosixCrossResult -> List PosixCrossResult
 batch next collected =
@@ -129,10 +140,18 @@ baseAt posix cross =
 
 toMoonDay : Int -> PosixCrossResult -> MoonDayInfo
 toMoonDay i posixCross =
-    { day = i
+    { day = i+1
     , riseTime = posixCross.riseTime |> Maybe.withDefault defaultTime
     , setTime  = posixCross.setTime  |> Maybe.withDefault defaultTime
     }
+
+isNothing : PosixCrossResult -> Bool
+isNothing lunarDay =
+    case lunarDay.riseTime of
+        Nothing -> True
+        Just time -> case lunarDay.setTime of
+                          Nothing -> True
+                          Just another_time -> False
 
 {-
 moonInfoByPeriod : Time.Zone -> Coordinated {} -> Posix -> Posix -> List MoonInfo
