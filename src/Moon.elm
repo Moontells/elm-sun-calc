@@ -2,32 +2,20 @@ module Moon exposing (..)
 
 import Time exposing (Posix, posixToMillis, millisToPosix)
 import TimeUtils exposing (..)
+import Calendar exposing (Date)
 
-import List exposing (map, range, indexedMap)
+import List exposing (map, range, filter, filterMap, append)
 
 import SunCalc exposing (CrossResult, moonIllumination, crossHorizon,
                          moonAltitude, addFloatHours, Coordinated)
 
 import DaysSince2000 exposing (defaultTime)
 
-type alias MoonInfo =
-    { day : Int -- Date --
-    , phase : Float  
-    , moon_days : List MoonDayInfo
-    }
 
+-- Calculations of lunar months  --
 
-type alias MoonDayInfo =
-    { day : Int
-    , riseTime : Posix
-    , setTime  : Posix
-    -- , riseDate : Date --
-    -- , setDate  : Date --
-    }
-
-
-startOfLunarMonth : Time.Zone -> Posix -> Posix
-startOfLunarMonth zone startTime = 
+previousNewMoon : Time.Zone -> Posix -> Posix
+previousNewMoon zone startTime = 
     let
         iterate last_phase time =
             let new_phase = moonIllumination time |> .phase
@@ -61,108 +49,163 @@ binsearchNewMoon left right =
         search 20 0 startOffset |> offsetToPosix -- 20 iterations give subsecond precision
 
 
-lunarDaysByPeriod : Time.Zone -> Coordinated {} -> Posix -> Posix -> List MoonDayInfo
-lunarDaysByPeriod zone coord start end =
+newMoonsInInterval : Time.Zone -> Posix -> Posix -> List Posix
+newMoonsInInterval zone start end =
+    let moons current =
+            if (before current start) then []
+            else current :: ( moons <| previousNewMoon zone <| addHours -1 zone current )
+    in moons end |> List.reverse
+
+
+-- Calculations of lunar days --
+
+lunarDaysByPeriod : Time.Zone -> Coordinated {} -> Posix -> Posix -> List MoonDay
+lunarDaysByPeriod zone coord intervalStart intervalEnd =
     let 
-        lunar_beginning = startOfLunarMonth zone start
-        hours = hourIntervals zone lunar_beginning end
-        calcCrossHorizon time =
+        startOfLunarMonth = previousNewMoon zone intervalStart
+        newMoons = newMoonsInInterval zone intervalStart intervalEnd
+        partialLunarDays time =
             crossHorizon 0
                     (moonAltitude (addMinutes -30 zone time) coord)
                     (moonAltitude time coord)
                     (moonAltitude (addMinutes 30 zone time) coord)
                     (CrossResult Nothing Nothing) |> baseAt time
     in
-        map calcCrossHorizon hours
-            |> List.reverse
-            |> composeToLunarDays
-            |> insertBeginningOfLunarMonth lunar_beginning
-            |> List.filter (not << isNothing)
-            |> indexedMap toMoonDay
+        hourIntervals zone startOfLunarMonth (addHours 25 zone intervalEnd)
+            |> map partialLunarDays
+            |> map notBeginningOfLunarMonth
+            |> insertNewMoons (startOfLunarMonth :: newMoons)
+            |> composeLunarDays
+            |> enumerateMoonDays
+            |> filterMap nonmaybe
+            |> map (toMoonDay coord)
+            |> trimByInterval intervalStart intervalEnd
 
 
-composeToLunarDays : List PosixCrossResult -> List PosixCrossResult
-composeToLunarDays crosses =
+type Interval b = Interval b b
+
+type Temporal a b = Temporal (Interval b) a
+
+
+nonmaybe : Temporal a (Maybe b) -> Maybe (Temporal a b)
+nonmaybe (Temporal interval additional) =
+    case interval of
+        (Interval (Just x) (Just y)) ->
+            Just <| Temporal (Interval x y) additional
+        _ ->
+            Nothing
+
+
+baseAt : Posix -> CrossResult -> Temporal {} (Maybe Posix)
+baseAt posix cross =
+    let 
+        base = Maybe.map (\offset -> addFloatHours offset posix)
+    in
+        Temporal (Interval (base cross.riseOffset) Nothing) {}
+
+
+insertNewMoons : List Posix -> List (Temporal {lunarMonthStart : Bool} (Maybe Posix)) -> List (Temporal {lunarMonthStart : Bool} (Maybe Posix))
+insertNewMoons newmoons lunardays =
+    let 
+        insertion time = Temporal (Interval (Just time) Nothing) {lunarMonthStart = True}
+        
+        iterate collected days moons =
+            case ( days , moons ) of 
+                ( current :: future_days , newMoonTime :: future_moons ) ->
+                    let (Temporal (Interval dayStart _) _) = current
+                    in case dayStart of 
+                           Nothing -> iterate (current :: collected) future_days moons
+                           Just dayStartTime -> if (before newMoonTime dayStartTime )
+                                                then iterate ((insertion newMoonTime) :: collected) days future_moons
+                                                else iterate (                current :: collected) future_days moons
+                ( _  , [] ) -> append (List.reverse days) collected
+                ( [] , _  ) -> collected
+    in iterate [] lunardays newmoons |> List.reverse
+
+
+composeLunarDays : List (Temporal a (Maybe Posix)) -> List (Temporal a (Maybe Posix))
+composeLunarDays crosses =
     let
         iterate new collected =
             case new of
-                [] ->
-                    collected
+                [] -> collected
                 current :: remaining ->
                     iterate remaining <| batch current collected
     in
-        iterate crosses []
+        iterate crosses [] |> List.reverse
 
-insertBeginningOfLunarMonth : Posix -> List PosixCrossResult -> List PosixCrossResult
-insertBeginningOfLunarMonth beginning lunarDays =
-    case lunarDays of
-        [] -> []
-        firstDay :: remaining ->
-            { firstDay | riseTime = Just beginning } :: remaining
 
-batch : PosixCrossResult -> List PosixCrossResult -> List PosixCrossResult
+batch : Temporal a (Maybe some) -> List (Temporal a (Maybe some)) -> List (Temporal a (Maybe some))
 batch next collected =
     case collected of
         [] ->
             List.singleton next
-        current :: previous ->
-            case next.setTime of
-                Nothing ->
-                    case next.riseTime of
-                        Nothing ->
-                            collected
-                        Just nextRiseTime ->
-                            case current.riseTime of
-                                Nothing ->
-                                    { current | riseTime = Just nextRiseTime } :: previous
-                                Just currentRiseTime ->
-                                    -- WTF ERROR --
-                                    next :: collected
-                Just time ->
+        (Temporal current_interval additional) :: previous ->
+            let (Temporal next_interval _) = next
+            in case (current_interval, next_interval) of
+                ( _ , Interval Nothing Nothing) ->
+                    collected
+                ( Interval cs Nothing , Interval ns Nothing ) ->
+                    next :: Temporal (Interval cs ns) additional :: previous
+                _ ->
                     next :: collected
-                
 
-type alias PosixCrossResult =
-    { riseTime : Maybe Posix
-    , setTime  : Maybe Posix
+
+notBeginningOfLunarMonth : Temporal {} b -> Temporal {lunarMonthStart : Bool} b
+notBeginningOfLunarMonth (Temporal interval _) =
+    Temporal interval {lunarMonthStart = False}
+
+
+enumerateMoonDays : List (Temporal {lunarMonthStart : Bool} b) -> List (Temporal {day : Int} b)
+enumerateMoonDays lunardays =
+    let numerate days index =
+            case days of
+                [] -> []
+                Temporal interval dayinfo :: remaining ->
+                          let daynumber = if dayinfo.lunarMonthStart then Just 1 else index
+                          in case daynumber of
+                                 Nothing -> numerate remaining Nothing
+                                 Just n  -> Temporal interval { day = n } :: (numerate remaining <| Just (n + 1))
+    in numerate lunardays Nothing
+
+
+-- Moon Day transofrmations --
+
+type alias MoonDay =
+    { day : Int
+    , phase : Float
+    , startTime : Posix
+    , endTime   : Posix
     }
 
-type alias LunarDay a b =
-    { start  : a
-    , end    : a
-    , rise   : a
-    , set    : a
-    , day    : b
+
+toMoonDay : Coordinated {} -> Temporal { day : Int } Posix -> MoonDay
+toMoonDay coord (Temporal (Interval start end) dayinfo) =
+    { day = dayinfo.day
+    , startTime = start
+    , endTime   = end
+    , phase = if dayinfo.day == 1 then 0 else moonIllumination start |> .phase
     }
 
 
-baseAt : Posix -> CrossResult -> PosixCrossResult
-baseAt posix cross =
-    let 
-        baseMaybe = Maybe.map (\offset -> addFloatHours offset posix)
-    in
-        { riseTime = baseMaybe cross.riseOffset
-        , setTime  = baseMaybe cross.setOffset
-        }
+trimByInterval : Posix -> Posix -> List MoonDay -> List MoonDay
+trimByInterval start end =
+    let isInInterval moonday = (before moonday.startTime end) && (before start moonday.endTime)
+    in filter isInInterval
 
 
-toMoonDay : Int -> PosixCrossResult -> MoonDayInfo
-toMoonDay i posixCross =
-    { day = i+1
-    , riseTime = posixCross.riseTime |> Maybe.withDefault defaultTime
-    , setTime  = posixCross.setTime  |> Maybe.withDefault defaultTime
+type alias DayInfo =
+    { date : Date
+    , moonInfo : List MoonDay
     }
 
-isNothing : PosixCrossResult -> Bool
-isNothing lunarDay =
-    case lunarDay.riseTime of
-        Nothing -> True
-        Just time -> case lunarDay.setTime of
-                          Nothing -> True
-                          Just another_time -> False
 
-{-
-moonInfoByPeriod : Time.Zone -> Coordinated {} -> Posix -> Posix -> List MoonInfo
-moonInfoByPeriod tzone coord start end =
--- days  = dayIntervals zone new_start end --
--}  
+moonDayCalendar : Time.Zone -> Coordinated {} -> Posix -> Posix -> List DayInfo
+moonDayCalendar zone coord start end = lunarDaysByPeriod zone coord start end
+                                     |> arrangeByDays zone start end
+
+arrangeByDays : Time.Zone -> Posix -> Posix -> List MoonDay -> List DayInfo
+arrangeByDays zone start end moondays = dayIntervals zone start end
+                                      |> map (\t -> ( t , trimByInterval t (nextDay zone t) moondays ) )
+                                      |> map (\(time, moonInfo) -> { date = Calendar.fromPosix time 
+                                                                   , moonInfo = moonInfo})
