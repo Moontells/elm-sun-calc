@@ -200,12 +200,12 @@ type alias DayInfo =
     }
 
 
-moonDayCalendar : Time.Zone -> Coordinated {} -> Posix -> Posix -> List DayInfo
-moonDayCalendar zone coord start end = lunarDaysByPeriod zone coord start end
+lunarCalendar : Time.Zone -> Coordinated {} -> Posix -> Posix -> List DayInfo
+lunarCalendar zone coord start end = lunarDaysByPeriod zone coord start end
                                      |> arrangeByDays zone start end
 
 arrangeByDays : Time.Zone -> Posix -> Posix -> List MoonDay -> List DayInfo
 arrangeByDays zone start end moondays = dayIntervals zone start end
-                                      |> map (\t -> ( t , trimByInterval t (nextDay zone t) moondays ) )
+                                      |> map (\t -> ( (addHours 3 zone t) , trimByInterval t (addHours 24 zone t) moondays ) )
                                       |> map (\(time, moonInfo) -> { date = Calendar.fromPosix time 
                                                                    , moonInfo = moonInfo})

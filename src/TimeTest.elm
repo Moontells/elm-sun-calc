@@ -9,7 +9,7 @@ import Time exposing (Month(..))
 import TimeUtils exposing (halfMonthBack, halfMonthForward)
 import Round
 
-import Moon exposing (lunarDaysByPeriod, moonDayCalendar, MoonDay)
+import Moon exposing (lunarDaysByPeriod, lunarCalendar, MoonDay)
 
 import Calendar
 
@@ -124,6 +124,6 @@ view model =
         end   = halfMonthForward model.zone model.time
     in
         div [] <| List.map (viewDayInfo model.zone)
-                           (moonDayCalendar model.zone { latitude  = 56.142406
+                           (lunarCalendar model.zone { latitude  = 56.142406
                                                        , longitude = 37.440216 }
                                             start end)
