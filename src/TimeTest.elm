@@ -3,11 +3,16 @@ module TimeTest exposing (..)
 
 import Browser
 import Html exposing (..)
+import Html.Attributes exposing (..)
 import Task
 import Time exposing (Month(..))
 import TimeUtils exposing (halfMonthBack, halfMonthForward)
+import Round
 
-import Moon exposing (lunarDaysByPeriod, MoonDayInfo)
+import Moon exposing (lunarDaysByPeriod, moonDayCalendar, MoonDay)
+
+import Calendar
+
 
 
 -- MAIN
@@ -73,33 +78,31 @@ subscriptions model =
 
 -- Lunar View
 
-viewMoonDay : Time.Zone -> MoonDayInfo -> String
+viewMoonDay : Time.Zone -> MoonDay -> String
 viewMoonDay zone moon =
-    "{ day : " ++ String.fromInt moon.day ++ ", rise : " ++ (viewTime zone moon.riseTime) ++
-    ", set : " ++ (viewTime zone moon.setTime) ++ " }"
+    "{ day : " ++ String.fromInt moon.day ++ ", start : " ++ (viewTime zone moon.startTime) ++
+    ", end : " ++ (viewTime zone moon.endTime) ++ ", phase : " ++ (Round.round 2 moon.phase) ++ " }"
+
+viewDate date =
+    [ Calendar.getYear date
+    , Calendar.getMonth date |> Calendar.monthToInt
+    , Calendar.getDay date ]
+    |> List.map String.fromInt
+    |> String.join "."
+
+viewDayInfo : Time.Zone -> Moon.DayInfo -> Html Msg
+viewDayInfo zone dayinfo =
+    div [ class "dayinfo"]
+        [ viewDate dayinfo.date |> ptext 
+        , div [ class "mooninfo" ] <| List.map (viewMoonDay zone >> ptext) dayinfo.moonInfo
+        ]
 
 
 -- VIEW
 
 
-
-ptext = \t -> p [] [text t] 
-
-toEnglishMonth : Month -> String
-toEnglishMonth month =
-      case month of
-        Jan -> "january"
-        Feb -> "february"
-        Mar -> "march"
-        Apr -> "april"
-        May -> "may"
-        Jun -> "june"
-        Jul -> "july"
-        Aug -> "august"
-        Sep -> "september"
-        Oct -> "october"
-        Nov -> "november"
-        Dec -> "december"
+ptext : String -> Html Msg
+ptext t = p [] [text t] 
 
 
 viewTime zone time =
@@ -108,7 +111,7 @@ viewTime zone time =
     minute = String.fromInt (Time.toMinute zone time)
     second = String.fromInt (Time.toSecond zone time)
     day    = String.fromInt (Time.toDay    zone time)
-    month  = toEnglishMonth (Time.toMonth  zone time)
+    month  = Time.toMonth zone time |> Calendar.monthToInt |> String.fromInt
     year   = String.fromInt (Time.toYear   zone time)         
   in
      day ++ "." ++ month ++ "." ++ year ++ " " ++ hour ++ ":" ++ minute ++ ":" ++ second 
@@ -120,7 +123,7 @@ view model =
         start = halfMonthBack    model.zone model.time
         end   = halfMonthForward model.zone model.time
     in
-        div [] <| List.map (viewMoonDay model.zone >> ptext)
-                           (lunarDaysByPeriod model.zone { latitude  = 56.142406
-                                                         , longitude = 37.440216 }
-                                              start end)
+        div [] <| List.map (viewDayInfo model.zone)
+                           (moonDayCalendar model.zone { latitude  = 56.142406
+                                                       , longitude = 37.440216 }
+                                            start end)
