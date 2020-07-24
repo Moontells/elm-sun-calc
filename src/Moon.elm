@@ -2,7 +2,7 @@ module Moon exposing (..)
 
 import Time exposing (Posix, posixToMillis, millisToPosix)
 import TimeUtils exposing (..)
-import Calendar exposing (Date)
+import Date exposing (Date, fromPosix)
 
 import List exposing (map, range, filter, filterMap, append)
 
@@ -207,5 +207,5 @@ lunarCalendar zone coord start end = lunarDaysByPeriod zone coord start end
 arrangeByDays : Time.Zone -> Posix -> Posix -> List MoonDay -> List DayInfo
 arrangeByDays zone start end moondays = dayIntervals zone start end
                                       |> map (\t -> ( (addHours 3 zone t) , trimByInterval t (addHours 24 zone t) moondays ) )
-                                      |> map (\(time, moonInfo) -> { date = Calendar.fromPosix time 
+                                      |> map (\(time, moonInfo) -> { date = Date.fromPosix zone time 
                                                                    , moonInfo = moonInfo})
