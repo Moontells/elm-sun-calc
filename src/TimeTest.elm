@@ -11,7 +11,7 @@ import Round
 
 import Moon exposing (lunarDaysByPeriod, lunarCalendar, MoonDay)
 
-import Calendar
+import Date
 
 
 
@@ -83,17 +83,10 @@ viewMoonDay zone moon =
     "{ day : " ++ String.fromInt moon.day ++ ", start : " ++ (viewTime zone moon.startTime) ++
     ", end : " ++ (viewTime zone moon.endTime) ++ ", phase : " ++ (Round.round 2 moon.phase) ++ " }"
 
-viewDate date =
-    [ Calendar.getYear date
-    , Calendar.getMonth date |> Calendar.monthToInt
-    , Calendar.getDay date ]
-    |> List.map String.fromInt
-    |> String.join "."
-
 viewDayInfo : Time.Zone -> Moon.DayInfo -> Html Msg
 viewDayInfo zone dayinfo =
     div [ class "dayinfo"]
-        [ viewDate dayinfo.date |> ptext 
+        [ Date.toIsoString dayinfo.date |> ptext 
         , div [ class "mooninfo" ] <| List.map (viewMoonDay zone >> ptext) dayinfo.moonInfo
         ]
 
@@ -111,7 +104,7 @@ viewTime zone time =
     minute = String.fromInt (Time.toMinute zone time)
     second = String.fromInt (Time.toSecond zone time)
     day    = String.fromInt (Time.toDay    zone time)
-    month  = Time.toMonth zone time |> Calendar.monthToInt |> String.fromInt
+    month  = Time.toMonth zone time |> Date.monthToNumber |> String.fromInt
     year   = String.fromInt (Time.toYear   zone time)         
   in
      day ++ "." ++ month ++ "." ++ year ++ " " ++ hour ++ ":" ++ minute ++ ":" ++ second 
