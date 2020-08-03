@@ -6,10 +6,10 @@ import Html exposing (..)
 import Html.Attributes exposing (..)
 import Task
 import Time exposing (Month(..))
-import TimeUtils exposing (halfMonthBack, halfMonthForward)
+import TimeUtils
 import Round
 
-import Moon exposing (lunarDaysByPeriod, lunarCalendar, MoonDay)
+import Moon
 
 import Date
 
@@ -78,7 +78,7 @@ subscriptions model =
 
 -- Lunar View
 
-viewMoonDay : Time.Zone -> MoonDay -> String
+viewMoonDay : Time.Zone -> Moon.MoonDay -> String
 viewMoonDay zone moon =
     "{ day : " ++ String.fromInt moon.day ++ ", start : " ++ (viewTime zone moon.startTime) ++
     ", end : " ++ (viewTime zone moon.endTime) ++ ", phase : " ++ (Round.round 2 moon.phase) ++ " }"
@@ -113,10 +113,10 @@ viewTime zone time =
 view : Model -> Html Msg
 view model =
     let 
-        start = halfMonthBack    model.zone model.time
-        end   = halfMonthForward model.zone model.time
+        start = TimeUtils.halfMonthBack    model.zone model.time
+        end   = TimeUtils.halfMonthForward model.zone model.time
     in
         div [] <| List.map (viewDayInfo model.zone)
-                           (lunarCalendar model.zone { latitude  = 56.142406
-                                                       , longitude = 37.440216 }
-                                            start end)
+                           (Moon.lunarCalendar model.zone { latitude  = 56.142406
+                                                          , longitude = 37.440216 }
+                                               start end)

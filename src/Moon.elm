@@ -6,10 +6,7 @@ import Date exposing (Date, fromPosix)
 
 import List exposing (map, range, filter, filterMap, append)
 
-import SunCalc exposing (CrossResult, moonIllumination, crossHorizon,
-                         moonAltitude, addFloatHours, Coordinated)
-
-import DaysSince2000 exposing (defaultTime)
+import SunCalc exposing (CrossResult, Coordinated)
 
 
 -- Calculations of lunar months  --
@@ -18,7 +15,7 @@ previousNewMoon : Time.Zone -> Posix -> Posix
 previousNewMoon zone startTime = 
     let
         iterate last_phase time =
-            let new_phase = moonIllumination time |> .phase
+            let new_phase = SunCalc.moonIllumination time |> .phase
             in case last_phase of
                 Nothing ->
                     iterate (Just new_phase) <| previousDay zone time
@@ -35,7 +32,7 @@ binsearchNewMoon : Posix -> Posix -> Posix
 binsearchNewMoon left right =
     let
         offsetToPosix = floor >> (+) (posixToMillis left) >> millisToPosix
-        phase = offsetToPosix >> moonIllumination >> .phase
+        phase = offsetToPosix >> SunCalc.moonIllumination >> .phase
         search i l r = 
             let
                 m = (l+r)/2
@@ -64,11 +61,12 @@ lunarDaysByPeriod zone coord intervalStart intervalEnd =
     let 
         startOfLunarMonth = previousNewMoon zone intervalStart
         newMoons = newMoonsInInterval zone intervalStart intervalEnd
+        altitude time offset = SunCalc.moonAltitude (addMinutes offset zone time) coord
         partialLunarDays time =
-            crossHorizon 0
-                    (moonAltitude (addMinutes -30 zone time) coord)
-                    (moonAltitude time coord)
-                    (moonAltitude (addMinutes 30 zone time) coord)
+            SunCalc.crossHorizon 0
+                    (altitude time -30)
+                    (altitude time 0)
+                    (altitude time 30)
                     (CrossResult Nothing Nothing) |> baseAt time
     in
         hourIntervals zone startOfLunarMonth (addHours 25 zone intervalEnd)
@@ -99,7 +97,7 @@ nonmaybe (Temporal interval additional) =
 baseAt : Posix -> CrossResult -> Temporal {} (Maybe Posix)
 baseAt posix cross =
     let 
-        base = Maybe.map (\offset -> addFloatHours offset posix)
+        base = Maybe.map (\offset -> SunCalc.addFloatHours offset posix)
     in
         Temporal (Interval (base cross.riseOffset) Nothing) {}
 
@@ -184,7 +182,7 @@ toMoonDay coord (Temporal (Interval start end) dayinfo) =
     { day = dayinfo.day
     , startTime = start
     , endTime   = end
-    , phase = if dayinfo.day == 1 then 0 else moonIllumination start |> .phase
+    , phase = if dayinfo.day == 1 then 0 else SunCalc.moonIllumination start |> .phase
     }
 
 
