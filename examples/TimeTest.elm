@@ -1,4 +1,4 @@
-module TimeTest exposing (..)
+module Example.TimeTest exposing (..)
 
 
 import Browser
