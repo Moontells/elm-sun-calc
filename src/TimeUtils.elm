@@ -27,3 +27,10 @@ dayIntervals  = intervals Day
 
 before : Posix -> Posix -> Bool
 before a b = (posixToMillis a) < (posixToMillis b)
+
+addFloatHours : Float -> Posix -> Posix
+addFloatHours dt posix =
+    posix
+        |> Time.posixToMillis
+        |> (+) (round <| dt * 3600000)
+        |> Time.millisToPosix

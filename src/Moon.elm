@@ -97,7 +97,7 @@ nonmaybe (Temporal interval additional) =
 baseAt : Posix -> CrossResult -> Temporal {} (Maybe Posix)
 baseAt posix cross =
     let 
-        base = Maybe.map (\offset -> SunCalc.addFloatHours offset posix)
+        base = Maybe.map (\offset -> TimeUtils.addFloatHours offset posix)
     in
         Temporal (Interval (base cross.riseOffset) Nothing) {}
 

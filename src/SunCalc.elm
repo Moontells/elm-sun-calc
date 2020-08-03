@@ -3,7 +3,7 @@ module SunCalc exposing
     , sunPosition, riseTime, setTime, sunrise, sunriseEnd, sunset, sunsetStart
     , MoonIllumination, moonIllumination, moonIlluminationByDays,  moonPosition
     , MoonTimes(..), moonTimes
-    , CrossResult, crossHorizon, moonAltitude, addFloatHours
+    , CrossResult, crossHorizon, moonAltitude
     )
 
 {-| This library provides functionality for calculating sun/moon position and light phases.
@@ -30,8 +30,7 @@ The `Posix` and `Zone` types are the ones defined in [elm/time](https://package.
 
 import DaysSince2000 exposing (DaysSince2000, unwrap)
 import Time exposing (Posix)
-
-import TimeUtils exposing (startOfDay, addHours)
+import TimeUtils
 
 
 {-| -}
@@ -464,7 +463,7 @@ moonTimes : Time.Zone -> Posix -> Coordinated {} -> MoonTimes
 moonTimes zone posix coords =
     let
         midnight =
-            startOfDay zone posix
+            TimeUtils.startOfDay zone posix
 
         initialHeight =
             moonAltitude midnight coords
@@ -482,9 +481,9 @@ loopCrossHorizon offset zone midnight coords currentResult =
         let
             newResult =
                 crossHorizon (toFloat offset)
-                    (moonAltitude (addHours (offset - 1) zone midnight) coords)
-                    (moonAltitude (addHours offset zone midnight) coords)
-                    (moonAltitude (addHours (offset + 1) zone midnight) coords)
+                    (moonAltitude (TimeUtils.addHours (offset - 1) zone midnight) coords)
+                    (moonAltitude (TimeUtils.addHours offset zone midnight) coords)
+                    (moonAltitude (TimeUtils.addHours (offset + 1) zone midnight) coords)
                     currentResult
         in
         if isEnded newResult then
@@ -601,26 +600,16 @@ toMoonTimes height midnight { riseOffset, setOffset } =
 
         ( Nothing, Just s ) ->
             SetAt <|
-                addFloatHours s midnight
+                TimeUtils.addFloatHours s midnight
 
         ( Just r, Nothing ) ->
             RiseAt <|
-                addFloatHours r midnight
+                TimeUtils.addFloatHours r midnight
 
         ( Just r, Just s ) ->
             RiseAndSetAt
-                (addFloatHours r midnight)
-                (addFloatHours s midnight)
-
-
--- TODO replace it with function from library
-addFloatHours : Float -> Posix -> Posix
-addFloatHours dt posix =
-    posix
-        |> Time.posixToMillis
-        |> (+) (round <| dt * 3600000)
-        |> Time.millisToPosix
-
+                (TimeUtils.addFloatHours r midnight)
+                (TimeUtils.addFloatHours s midnight)
 
 
 -- GENERAL CALCULATIONS FOR POSITION
