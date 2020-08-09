@@ -1,49 +1,56 @@
 module SunCalc exposing
-    ( Coordinated, Positioned
-    , sunPosition, riseTime, setTime, sunrise, sunriseEnd, sunset, sunsetStart
-    , MoonIllumination, moonIllumination, moonPosition, MoonTimes(..), moonTimes
+    ( Location
+    , SunPosition, sunPosition
+    , morningSunTime, sunrise, sunriseEnd, dawn, nauticalDawn, nightEnd, goldenHourEnd
+    , eveningSunTime, sunset, sunsetStart, dusk, nauticalDusk, night, golderHour
+    , MoonIllumination, moonIllumination, MoonPosition, moonPosition, MoonTimes(..), moonTimes
     )
 
-{-| This library provides functionality for calculating sun/moon position and light phases.
-This is a port of Vladimir Agafonkin's [SunCalc JavaScript library](https://github.com/mourner/suncalc)
-
-The `Posix` and `Zone` types are the ones defined in [elm/time](https://package.elm-lang.org/packages/elm/time/latest).
+{-| This module provides functionality for calculating sun/moon position and light phases.
+This is a port of Vladimir Agafonkin's [SunCalc JavaScript library](https://github.com/mourner/suncalc).
 
 
-# Coordinates systems
+# Location
 
-@docs Coordinated, Positioned
+@docs Location
 
 
-# Sun
+# Sun position
 
-@docs sunPosition, riseTime, setTime, sunrise, sunriseEnd, sunset, sunsetStart
+@docs SunPosition, sunPosition
+
+
+# Morning sun time
+
+@docs morningSunTime, sunrise, sunriseEnd, dawn, nauticalDawn, nightEnd, goldenHourEnd
+
+
+# Evening sun time
+
+@docs eveningSunTime, sunset, sunsetStart, dusk, nauticalDusk, night, golderHour
 
 
 # Moon
 
-@docs MoonIllumination, moonIllumination, moonPosition, MoonTimes, moonTimes
+@docs MoonIllumination, moonIllumination, MoonPosition, moonPosition, MoonTimes, moonTimes
 
 -}
 
-import DaysSince2000 exposing (DaysSince2000, unwrap)
-import Time exposing (Posix)
-import Time.Extra
+import DaysSince2000 exposing (DaysSince2000)
+import Time
+import Time.Extra as Time
 
 
-{-| -}
-type alias Coordinated a =
+
+-- LOCATION
+
+
+{-| Geographic location. Extensible record is used for convenience to avoid unnecessary transformations.
+-}
+type alias Location a =
     { a
         | latitude : Float
         , longitude : Float
-    }
-
-
-{-| -}
-type alias Positioned a =
-    { a
-        | azimuth : Float
-        , altitude : Float
     }
 
 
@@ -51,28 +58,36 @@ type alias Positioned a =
 -- SUN COMPUTATIONS
 
 
-{-| Calculates sun position for given time, latitude and longitude
+{-| Sun position
 -}
-sunPosition : Posix -> Coordinated a -> Positioned {}
-sunPosition posix coords =
+type alias SunPosition =
+    { azimuth : Float
+    , altitude : Float
+    }
+
+
+{-| Calculates sun position for given time and location
+-}
+sunPosition : Time.Posix -> Location a -> SunPosition
+sunPosition posix location =
     let
         latitude =
-            degrees -coords.longitude
+            degrees -location.longitude
 
         longitude =
-            degrees coords.latitude
+            degrees location.latitude
 
         days =
             DaysSince2000.fromPosix posix
 
-        equatorialCoords =
-            sunCoords days
+        equatorialLocation =
+            sunLocation days
 
         hourAngle =
-            siderealTime days latitude - equatorialCoords.rightAscension
+            siderealTime days latitude - equatorialLocation.rightAscension
     in
-    { azimuth = azimuth hourAngle longitude equatorialCoords.declination
-    , altitude = altitude hourAngle longitude equatorialCoords.declination
+    { azimuth = azimuth hourAngle longitude equatorialLocation.declination
+    , altitude = altitude hourAngle longitude equatorialLocation.declination
     }
 
 
@@ -80,9 +95,9 @@ sunPosition posix coords =
 -}
 earthSolarMeanAnomaly : DaysSince2000 -> Float
 earthSolarMeanAnomaly days =
-    (earthM1 * unwrap days)
-        + earthM0
-        |> degrees
+    degrees <|
+        (earthM1 * DaysSince2000.unwrap days)
+            + earthM0
 
 
 {-| Calculates [equation of the center](https://en.wikipedia.org/wiki/Equation_of_the_center) for Earth.
@@ -106,10 +121,10 @@ earthEquationOfCenter earthSMA =
         c3 =
             0.0003
     in
-    (c1 * sin earthSMA)
-        + (c2 * sin (2 * earthSMA))
-        + (c3 * sin (3 * earthSMA))
-        |> degrees
+    degrees <|
+        (c1 * sin earthSMA)
+            + (c2 * sin (2 * earthSMA))
+            + (c3 * sin (3 * earthSMA))
 
 
 {-| Calculates [ecliptic](https://en.wikipedia.org/wiki/Ecliptic_coordinate_system) longitude for Earth
@@ -122,8 +137,16 @@ earthEclipticLongitude earthSMA =
         + pi
 
 
-sunCoords : DaysSince2000 -> EquatorialCoordinated {}
-sunCoords days =
+{-| Geocentric ecliptic location of the Sun
+-}
+type alias SunLocation =
+    { declination : Float
+    , rightAscension : Float
+    }
+
+
+sunLocation : DaysSince2000 -> SunLocation
+sunLocation days =
     let
         earthSMA =
             earthSolarMeanAnomaly days
@@ -137,99 +160,22 @@ sunCoords days =
 
 
 
--- SET/RISE TIMES COMPUTATION FOR SUN
+-- SUN TIME COMPUTATIONS
 
 
-{-| Computes the time where the sun passes at a given angle in the evening.
-Example:
-
-    setTime
-        -0.833 -- angle
-        now    -- current time
-        coords -- your coordinates
-
-Use [sunset](#sunset) or [sunsetStart](#sunsetStart) for predefined angles.
-
--}
-setTime : Float -> Posix -> Coordinated a -> Posix
-setTime angle posix coords =
-    time Set angle posix coords 0
+type SunTime
+    = Morning
+    | Evening
 
 
-{-| Computes the time where the sun passes at a given angle in the morning.
-Example:
-
-    riseTime
-        -0.833 -- angle
-        now    -- current time
-        coords -- your coordinates
-
-Use [sunrise](#sunrise) or [sunriseEnd](#sunsetStart) for predefined angles.
-
--}
-riseTime : Float -> Posix -> Coordinated a -> Posix
-riseTime angle posix coords =
-    time Rise angle posix coords 0
-
-
-sunriseSetAngle : Float
-sunriseSetAngle =
-    -0.833
-
-
-{-| Computes the time for the sunrise. See also [setTime](#setTime).
--}
-sunrise : Posix -> Coordinated a -> Posix
-sunrise =
-    riseTime sunriseSetAngle
-
-
-{-| Computes the time for the sunset. See also [riseTime](#riseTime).
--}
-sunset : Posix -> Coordinated a -> Posix
-sunset =
-    setTime sunriseSetAngle
-
-
-sunriseSetEndAngle : Float
-sunriseSetEndAngle =
-    -0.3
-
-
-{-| Computes the time for the end of the sunrise. See also [riseTime](#riseTime).
--}
-sunriseEnd : Posix -> Coordinated a -> Posix
-sunriseEnd =
-    riseTime sunriseSetEndAngle
-
-
-{-| Computes the time for the begning of the sunset. See also [setTime](#setTime).
--}
-sunsetStart : Posix -> Coordinated a -> Posix
-sunsetStart =
-    setTime sunriseSetEndAngle
-
-
-type RiseSet
-    = Rise
-    | Set
-
-
-{-| Constant needed for time computation (what does it stand for???)
--}
-j0 : Float
-j0 =
-    0.0009
-
-
-time : RiseSet -> Float -> Posix -> Coordinated a -> Float -> Posix
-time riseSet angle posix coords height =
+sunTime : SunTime -> Float -> Time.Posix -> Location a -> Float -> Time.Posix
+sunTime time angle posix location height =
     let
         latitude =
-            degrees -coords.longitude
+            degrees -location.longitude
 
         longitude =
-            degrees coords.latitude
+            degrees location.latitude
 
         days =
             DaysSince2000.fromPosix posix
@@ -239,11 +185,7 @@ time riseSet angle posix coords height =
 
         julianCycle =
             days
-                |> DaysSince2000.map
-                    (\ds ->
-                        round (ds - j0 - latitude / (2 * pi))
-                            |> toFloat
-                    )
+                |> DaysSince2000.map (\ds -> toFloat (round (ds - j0 - latitude / (2 * pi))))
 
         approxTransit =
             computeApproxTransit 0 latitude julianCycle
@@ -265,9 +207,7 @@ time riseSet angle posix coords height =
 
         hourAngle =
             acos
-                ((sin actualAngle - sin longitude * sin declination)
-                    / (cos longitude * cos declination)
-                )
+                ((sin actualAngle - sin longitude * sin declination) / (cos longitude * cos declination))
 
         set =
             solarTransit
@@ -275,82 +215,217 @@ time riseSet angle posix coords height =
                 solarMeanAnomaly
                 eclipticLongitude
     in
-    case riseSet of
-        Set ->
-            DaysSince2000.toPosix set
-
-        Rise ->
-            DaysSince2000.map2
-                (\dsSet dsNoon ->
-                    2 * dsNoon - dsSet
-                )
-                set
-                noon
+    case time of
+        Morning ->
+            DaysSince2000.map2 (\dsSet dsNoon -> 2 * dsNoon - dsSet) set noon
                 |> DaysSince2000.toPosix
+
+        Evening ->
+            DaysSince2000.toPosix set
 
 
 solarTransit : DaysSince2000 -> Float -> Float -> DaysSince2000
 solarTransit days solarMeanAnomaly eclipticLongitude =
     days
-        |> DaysSince2000.map
-            (\ds ->
-                ds + 0.0053 * sin solarMeanAnomaly - 0.0069 * sin (2 * eclipticLongitude)
-            )
+        |> DaysSince2000.map (\ds -> ds + 0.0053 * sin solarMeanAnomaly - 0.0069 * sin (2 * eclipticLongitude))
 
 
 computeApproxTransit : Float -> Float -> DaysSince2000 -> DaysSince2000
 computeApproxTransit hourAngle longitude julianCycle =
     julianCycle
-        |> DaysSince2000.map
-            (\ds ->
-                j0 + (hourAngle + longitude) / (2 * pi) + ds
-            )
+        |> DaysSince2000.map (\ds -> j0 + (hourAngle + longitude) / (2 * pi) + ds)
+
+
+
+-- MORNING SUN TIME COMPUTATIONS
+
+
+{-| Calculates the time where the sun passes at a given angle in the morning.
+
+Example:
+
+    morningSunTime
+        -0.833 -- angle
+        now    -- current time
+        location -- your coordinates
+
+Use [sunrise](#sunrise), [sunriseEnd](#sunriseEnd), etc.. for predefined angles.
+
+-}
+morningSunTime : Float -> Time.Posix -> Location a -> Time.Posix
+morningSunTime angle posix location =
+    sunTime Morning angle posix location 0
+
+
+{-| Calculates the time for the sunrise. See also [morningSunTime](#morningSunTime).
+Sunrise - top edge of the sun appears on the horizon.
+-}
+sunrise : Time.Posix -> Location a -> Time.Posix
+sunrise =
+    morningSunTime -0.833
+
+
+{-| Calculates the time for the end of the sunrise. See also [morningSunTime](#morningSunTime).
+Sunrise ends - bottom edge of the sun touches the horizon.
+-}
+sunriseEnd : Time.Posix -> Location a -> Time.Posix
+sunriseEnd =
+    morningSunTime -0.3
+
+
+{-| Calculates the time for the dawn. See also [morningSunTime](#morningSunTime).
+Dawn - morning nautical twilight ends, morning civil twilight starts.
+-}
+dawn : Time.Posix -> Location a -> Time.Posix
+dawn =
+    morningSunTime -6
+
+
+{-| Calculates the time for the nautical dawn. See also [morningSunTime](#morningSunTime).
+Nautical dawn - morning nautical twilight starts.
+-}
+nauticalDawn : Time.Posix -> Location a -> Time.Posix
+nauticalDawn =
+    morningSunTime -12
+
+
+{-| Calculates the time for the night end. See also [morningSunTime](#morningSunTime).
+Night ends - morning astronomical twilight starts.
+-}
+nightEnd : Time.Posix -> Location a -> Time.Posix
+nightEnd =
+    morningSunTime -18
+
+
+{-| Calculates the time for the golden hour end. See also [morningSunTime](#morningSunTime).
+Morning golden hour - soft light, best time for photography.
+-}
+goldenHourEnd : Time.Posix -> Location a -> Time.Posix
+goldenHourEnd =
+    morningSunTime 6
+
+
+
+-- EVENING SUN TIME COMPUTATIONS
+
+
+{-| Calculates the time where the sun passes at a given angle in the evening.
+
+Example:
+
+    eveningSunTime
+        -0.833 -- angle
+        now    -- current time
+        location -- your coordinates
+
+Use [sunset](#sunset) or [sunsetStart](#sunsetStart) for predefined angles.
+
+-}
+eveningSunTime : Float -> Time.Posix -> Location a -> Time.Posix
+eveningSunTime angle posix location =
+    sunTime Evening angle posix location 0
+
+
+{-| Calculates the time for the sunset. See also [eveningSunTime](#eveningSunTime).
+Sunset - sun disappears below the horizon, evening civil twilight starts.
+-}
+sunset : Time.Posix -> Location a -> Time.Posix
+sunset =
+    eveningSunTime -0.833
+
+
+{-| Calculates the time for the begning of the sunset. See also [eveningSunTime](#eveningSunTime).
+Sunset starts - bottom edge of the sun touches the horizon.
+-}
+sunsetStart : Time.Posix -> Location a -> Time.Posix
+sunsetStart =
+    eveningSunTime -0.3
+
+
+{-| Calculates the time for the dusk. See also [eveningSunTime](#eveningSunTime).
+Dusk - evening nautical twilight starts.
+-}
+dusk : Time.Posix -> Location a -> Time.Posix
+dusk =
+    morningSunTime -6
+
+
+{-| Calculates the time for the nautical dusk. See also [eveningSunTime](#eveningSunTime).
+Nautical dusk - evening astronomical twilight starts.
+-}
+nauticalDusk : Time.Posix -> Location a -> Time.Posix
+nauticalDusk =
+    morningSunTime -12
+
+
+{-| Calculates the time for the beginning of the night. See also [eveningSunTime](#eveningSunTime).
+Night starts - dark enough for astronomical observations.
+-}
+night : Time.Posix -> Location a -> Time.Posix
+night =
+    morningSunTime -18
+
+
+{-| Calculates the time for the beginning of the golden hour. See also [eveningSunTime](#eveningSunTime).
+Evening golden hour - soft light, best time for photography.
+-}
+golderHour : Time.Posix -> Location a -> Time.Posix
+golderHour =
+    morningSunTime 6
 
 
 
 -- MOON COMPUTATIONS
 
 
-{-| Computes the position of the moon at a given time and position
+{-| Moon position
 -}
-moonPosition :
-    Posix
-    -> Coordinated a
-    -> Positioned { distance : Float, parallacticAngle : Float }
-moonPosition posix coords =
+type alias MoonPosition =
+    { azimuth : Float
+    , altitude : Float
+    , distance : Float
+    , parallacticAngle : Float
+    }
+
+
+{-| Calculates the position of the moon at a given time and location
+-}
+moonPosition : Time.Posix -> Location a -> MoonPosition
+moonPosition posix location =
     let
         latitude =
-            degrees -coords.longitude
+            degrees -location.longitude
 
         longitude =
-            degrees coords.latitude
+            degrees location.latitude
 
         days =
             DaysSince2000.fromPosix posix
 
-        equatorialCoords =
-            moonCoords days
+        equatorialLocation =
+            moonLocation days
 
         hourAngle =
-            siderealTime days latitude - equatorialCoords.rightAscension
+            siderealTime days latitude - equatorialLocation.rightAscension
 
         actualAltitude =
-            altitude hourAngle longitude equatorialCoords.declination
+            altitude hourAngle longitude equatorialLocation.declination
 
         -- formula 14.1 of "Astronomical Algorithms" 2nd edition by Jean Meeus (Willmann-Bell, Richmond) 1998.
         parallacticAngle =
             atan2
                 (sin hourAngle)
-                (tan longitude * cos equatorialCoords.declination - sin equatorialCoords.declination * cos hourAngle)
+                (tan longitude * cos equatorialLocation.declination - sin equatorialLocation.declination * cos hourAngle)
     in
-    { azimuth = azimuth hourAngle longitude equatorialCoords.declination
+    { azimuth = azimuth hourAngle longitude equatorialLocation.declination
     , altitude = actualAltitude + astroRefraction actualAltitude
-    , distance = equatorialCoords.distance
+    , distance = equatorialLocation.distance
     , parallacticAngle = parallacticAngle
     }
 
 
-{-| -}
+{-| Moon illumination
+-}
 type alias MoonIllumination =
     { fraction : Float
     , phase : Float
@@ -358,19 +433,21 @@ type alias MoonIllumination =
     }
 
 
-{-| Compute moon illumination at a given time
+{-| Calculates moon illumination at a given time.
+By subtracting the `parallacticAngle` from the `angle` one can get the zenith angle of the moons bright limb (anticlockwise).
+The zenith angle can be used do draw the moon shape from the observers perspective (e.g. moon lying on its back).
 -}
-moonIllumination : Posix -> MoonIllumination
+moonIllumination : Time.Posix -> MoonIllumination
 moonIllumination posix =
     let
         days =
             DaysSince2000.fromPosix posix
 
         sun =
-            sunCoords days
+            sunLocation days
 
         moon =
-            moonCoords days
+            moonLocation days
 
         geocentricElongation =
             acos (sin sun.declination * sin moon.declination + cos sun.declination * cos moon.declination * cos (sun.rightAscension - moon.rightAscension))
@@ -398,24 +475,26 @@ moonIllumination posix =
     }
 
 
-type alias EquatorialCoordinated a =
-    { a
-        | declination : Float
-        , rightAscension : Float
+{-| Geocentric ecliptic location of the Moon
+-}
+type alias MoonLocation =
+    { declination : Float
+    , rightAscension : Float
+    , distance : Float
     }
 
 
-moonCoords : DaysSince2000 -> EquatorialCoordinated { distance : Float }
-moonCoords days =
+moonLocation : DaysSince2000 -> MoonLocation
+moonLocation days =
     let
         eclipticLongitude =
-            (218.316 + 13.176396 * unwrap days) |> degrees
+            degrees (218.316 + 13.176396 * DaysSince2000.unwrap days)
 
         meanAnomaly =
-            (134.963 + 13.064993 * unwrap days) |> degrees
+            degrees (134.963 + 13.064993 * DaysSince2000.unwrap days)
 
         meanDistance =
-            (93.272 + 13.22935 * unwrap days) |> degrees
+            degrees (93.272 + 13.22935 * DaysSince2000.unwrap days)
 
         longitude =
             eclipticLongitude + degrees 6.289 * sin meanAnomaly
@@ -444,33 +523,33 @@ astroRefraction alti =
 -- MOON TIMES COMPUTATIONS
 
 
-{-| -}
+{-| Moon rise and set times
+-}
 type MoonTimes
-    = RiseAt Posix
-    | SetAt Posix
-    | RiseAndSetAt Posix Posix
+    = RiseAt Time.Posix
+    | SetAt Time.Posix
+    | RiseAndSetAt Time.Posix Time.Posix
     | AlwaysUp
     | AlwaysDown
 
 
-{-| Computes the times of rise and set (if any) at the day given by
-the `Posix` and `Zone` argument.
+{-| Calculates the times of the Moon rise and set (if any) for given time and location
 -}
-moonTimes : Time.Zone -> Posix -> Coordinated {} -> MoonTimes
-moonTimes zone posix coords =
+moonTimes : Time.Zone -> Time.Posix -> Location a -> MoonTimes
+moonTimes zone posix location =
     let
         midnight =
-            Time.Extra.startOfDay zone posix
+            Time.startOfDay zone posix
 
         initialHeight =
-            moonAltitude midnight coords
+            moonAltitude midnight location
     in
-    loopCrossHorizon 1 midnight coords (CrossResult Nothing Nothing)
+    loopCrossHorizon 1 midnight location (CrossResult Nothing Nothing)
         |> toMoonTimes initialHeight midnight
 
 
-loopCrossHorizon : Int -> Posix -> Coordinated {} -> CrossResult -> CrossResult
-loopCrossHorizon offset midnight coords currentResult =
+loopCrossHorizon : Int -> Time.Posix -> Location a -> CrossResult -> CrossResult
+loopCrossHorizon offset midnight location currentResult =
     if offset > 24 then
         currentResult
 
@@ -478,21 +557,21 @@ loopCrossHorizon offset midnight coords currentResult =
         let
             newResult =
                 crossHorizon (toFloat offset)
-                    (moonAltitude (Time.Extra.addHours (offset - 1) midnight) coords)
-                    (moonAltitude (Time.Extra.addHours offset midnight) coords)
-                    (moonAltitude (Time.Extra.addHours (offset + 1) midnight) coords)
+                    (moonAltitude (Time.addHours (offset - 1) midnight) location)
+                    (moonAltitude (Time.addHours offset midnight) location)
+                    (moonAltitude (Time.addHours (offset + 1) midnight) location)
                     currentResult
         in
         if isEnded newResult then
             newResult
 
         else
-            loopCrossHorizon (offset + 2) midnight coords newResult
+            loopCrossHorizon (offset + 2) midnight location newResult
 
 
-moonAltitude : Posix -> Coordinated {} -> Float
-moonAltitude date coords =
-    moonPosition date coords
+moonAltitude : Time.Posix -> Location a -> Float
+moonAltitude date location =
+    moonPosition date location
         |> .altitude
         -- altitude correction (why ???)
         |> (-) (degrees 0.133)
@@ -560,20 +639,20 @@ crossHorizon offset altBefore altCurrent altAfter currentResult =
         case nbRoots of
             1 ->
                 if altBefore < 0 then
-                    { currentResult | riseOffset = Just <| offset + x1 }
+                    { currentResult | riseOffset = Just (offset + x1) }
 
                 else
-                    { currentResult | setOffset = Just <| offset + x1 }
+                    { currentResult | setOffset = Just (offset + x1) }
 
             2 ->
                 if ye < 0 then
-                    { riseOffset = Just <| offset + x2
-                    , setOffset = Just <| offset + x1
+                    { riseOffset = Just (offset + x2)
+                    , setOffset = Just (offset + x1)
                     }
 
                 else
-                    { riseOffset = Just <| offset + x1
-                    , setOffset = Just <| offset + x2
+                    { riseOffset = Just (offset + x1)
+                    , setOffset = Just (offset + x2)
                     }
 
             _ ->
@@ -585,7 +664,7 @@ isEnded { riseOffset, setOffset } =
     riseOffset /= Nothing && setOffset /= Nothing
 
 
-toMoonTimes : Float -> Posix -> CrossResult -> MoonTimes
+toMoonTimes : Float -> Time.Posix -> CrossResult -> MoonTimes
 toMoonTimes height midnight { riseOffset, setOffset } =
     case ( riseOffset, setOffset ) of
         ( Nothing, Nothing ) ->
@@ -596,24 +675,20 @@ toMoonTimes height midnight { riseOffset, setOffset } =
                 AlwaysDown
 
         ( Nothing, Just s ) ->
-            SetAt <|
-                addHours s midnight
+            SetAt (addHours s midnight)
 
         ( Just r, Nothing ) ->
-            RiseAt <|
-                addHours r midnight
+            RiseAt (addHours r midnight)
 
         ( Just r, Just s ) ->
-            RiseAndSetAt
-                (addHours r midnight)
-                (addHours s midnight)
+            RiseAndSetAt (addHours r midnight) (addHours s midnight)
 
 
-addHours : Float -> Posix -> Posix
+addHours : Float -> Time.Posix -> Time.Posix
 addHours dt posix =
     posix
         |> Time.posixToMillis
-        |> (+) (round <| dt * 3600000)
+        |> (+) (round (dt * 3600000))
         |> Time.millisToPosix
 
 
@@ -625,9 +700,9 @@ addHours dt posix =
 -}
 earthDeclination : Float -> Float -> Float
 earthDeclination eclipticLongitude eclipticLatitude =
-    (sin eclipticLatitude * cos earthObliquity)
-        + (cos eclipticLatitude * sin earthObliquity * sin eclipticLongitude)
-        |> asin
+    asin <|
+        (sin eclipticLatitude * cos earthObliquity)
+            + (cos eclipticLatitude * sin earthObliquity * sin eclipticLongitude)
 
 
 {-| Calculates [right ascension](https://en.wikipedia.org/wiki/Right_ascension) for Earth
@@ -635,9 +710,7 @@ earthDeclination eclipticLongitude eclipticLatitude =
 earthRightAscension : Float -> Float -> Float
 earthRightAscension eclipticLongitude eclipticLatitude =
     atan2
-        ((sin eclipticLongitude * cos earthObliquity)
-            - (tan eclipticLatitude * sin earthObliquity)
-        )
+        ((sin eclipticLongitude * cos earthObliquity) - (tan eclipticLatitude * sin earthObliquity))
         (cos eclipticLongitude)
 
 
@@ -645,7 +718,7 @@ earthRightAscension eclipticLongitude eclipticLatitude =
 -}
 siderealTime : DaysSince2000 -> Float -> Float
 siderealTime days latitude =
-    (earthSiderealTimeJulian2000 + earthSiderealTimeChangeRate * unwrap days)
+    (earthSiderealTimeJulian2000 + earthSiderealTimeChangeRate * DaysSince2000.unwrap days)
         |> degrees
         |> (\a -> a - latitude)
 
@@ -663,13 +736,20 @@ azimuth hourAngle longitude declination =
 -}
 altitude : Float -> Float -> Float -> Float
 altitude hourAngle longitude declination =
-    (sin longitude * sin declination)
-        + (cos longitude * cos declination * cos hourAngle)
-        |> asin
+    asin <|
+        (sin longitude * sin declination)
+            + (cos longitude * cos declination * cos hourAngle)
 
 
 
 -- CONSTANTS
+
+
+{-| Constant needed for Sun time computation (what does it stand for???)
+-}
+j0 : Float
+j0 =
+    0.0009
 
 
 {-| Earth [mean anomaly](https://en.wikipedia.org/wiki/Mean_anomaly)

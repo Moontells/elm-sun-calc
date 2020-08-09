@@ -7,7 +7,7 @@ module DaysSince2000 exposing
     , unwrap
     )
 
-import Time exposing (Posix)
+import Time
 
 
 type DaysSince2000
@@ -41,7 +41,7 @@ julian2000 =
 
 {-| Converts date to [Julian date](https://en.wikipedia.org/wiki/Julian_day)
 -}
-fromPosix : Posix -> DaysSince2000
+fromPosix : Time.Posix -> DaysSince2000
 fromPosix posix =
     toFloat (Time.posixToMillis posix)
         / msPerDay
@@ -52,7 +52,7 @@ fromPosix posix =
 
 {-| Converts [Julian date](https://en.wikipedia.org/wiki/Julian_day) to Gregorian date
 -}
-toPosix : DaysSince2000 -> Posix
+toPosix : DaysSince2000 -> Time.Posix
 toPosix (DaysSince2000 days) =
     (julian2000 + days - julian1970)
         * msPerDay
@@ -60,7 +60,6 @@ toPosix (DaysSince2000 days) =
         |> Time.millisToPosix
 
 
-{-| -}
 unwrap : DaysSince2000 -> Float
 unwrap (DaysSince2000 days) =
     days
