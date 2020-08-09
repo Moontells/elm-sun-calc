@@ -1,7 +1,9 @@
 module SunCalc exposing
     ( Coordinated, Positioned
     , sunPosition, riseTime, setTime, sunrise, sunriseEnd, sunset, sunsetStart
-    , MoonIllumination, moonIllumination, moonPosition, MoonTimes(..), moonTimes
+    , MoonIllumination, moonIllumination, moonIlluminationByDays,  moonPosition
+    , MoonTimes(..), moonTimes
+    , CrossResult, crossHorizon, moonAltitude
     )
 
 {-| This library provides functionality for calculating sun/moon position and light phases.
@@ -28,7 +30,7 @@ The `Posix` and `Zone` types are the ones defined in [elm/time](https://package.
 
 import DaysSince2000 exposing (DaysSince2000, unwrap)
 import Time exposing (Posix)
-import Time.Extra
+import TimeUtils
 
 
 {-| -}
@@ -360,12 +362,13 @@ type alias MoonIllumination =
 
 {-| Compute moon illumination at a given time
 -}
-moonIllumination : Posix -> MoonIllumination
-moonIllumination posix =
-    let
-        days =
-            DaysSince2000.fromPosix posix
 
+moonIllumination : Posix -> MoonIllumination
+moonIllumination = moonIlluminationByDays << DaysSince2000.fromPosix
+
+moonIlluminationByDays : DaysSince2000 -> MoonIllumination
+moonIlluminationByDays days =
+    let
         sun =
             sunCoords days
 
@@ -460,17 +463,17 @@ moonTimes : Time.Zone -> Posix -> Coordinated {} -> MoonTimes
 moonTimes zone posix coords =
     let
         midnight =
-            Time.Extra.startOfDay zone posix
+            TimeUtils.startOfDay zone posix
 
         initialHeight =
             moonAltitude midnight coords
     in
-    loopCrossHorizon 1 midnight coords (CrossResult Nothing Nothing)
+    loopCrossHorizon 1 zone midnight coords (CrossResult Nothing Nothing)
         |> toMoonTimes initialHeight midnight
 
 
-loopCrossHorizon : Int -> Posix -> Coordinated {} -> CrossResult -> CrossResult
-loopCrossHorizon offset midnight coords currentResult =
+loopCrossHorizon : Int -> Time.Zone -> Posix -> Coordinated {} -> CrossResult -> CrossResult
+loopCrossHorizon offset zone midnight coords currentResult =
     if offset > 24 then
         currentResult
 
@@ -478,16 +481,16 @@ loopCrossHorizon offset midnight coords currentResult =
         let
             newResult =
                 crossHorizon (toFloat offset)
-                    (moonAltitude (Time.Extra.addHours (offset - 1) midnight) coords)
-                    (moonAltitude (Time.Extra.addHours offset midnight) coords)
-                    (moonAltitude (Time.Extra.addHours (offset + 1) midnight) coords)
+                    (moonAltitude (TimeUtils.addHours (offset - 1) zone midnight) coords)
+                    (moonAltitude (TimeUtils.addHours offset zone midnight) coords)
+                    (moonAltitude (TimeUtils.addHours (offset + 1) zone midnight) coords)
                     currentResult
         in
         if isEnded newResult then
             newResult
 
         else
-            loopCrossHorizon (offset + 2) midnight coords newResult
+            loopCrossHorizon (offset + 2) zone midnight coords newResult
 
 
 moonAltitude : Posix -> Coordinated {} -> Float
@@ -597,25 +600,16 @@ toMoonTimes height midnight { riseOffset, setOffset } =
 
         ( Nothing, Just s ) ->
             SetAt <|
-                addHours s midnight
+                TimeUtils.addFloatHours s midnight
 
         ( Just r, Nothing ) ->
             RiseAt <|
-                addHours r midnight
+                TimeUtils.addFloatHours r midnight
 
         ( Just r, Just s ) ->
             RiseAndSetAt
-                (addHours r midnight)
-                (addHours s midnight)
-
-
-addHours : Float -> Posix -> Posix
-addHours dt posix =
-    posix
-        |> Time.posixToMillis
-        |> (+) (round <| dt * 3600000)
-        |> Time.millisToPosix
-
+                (TimeUtils.addFloatHours r midnight)
+                (TimeUtils.addFloatHours s midnight)
 
 
 -- GENERAL CALCULATIONS FOR POSITION
