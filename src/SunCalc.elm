@@ -95,9 +95,7 @@ sunPosition posix location =
 -}
 earthSolarMeanAnomaly : DaysSince2000 -> Float
 earthSolarMeanAnomaly days =
-    degrees <|
-        (earthM1 * DaysSince2000.unwrap days)
-            + earthM0
+    degrees ((earthM1 * DaysSince2000.unwrap days) + earthM0)
 
 
 {-| Calculates [equation of the center](https://en.wikipedia.org/wiki/Equation_of_the_center) for Earth.
@@ -121,20 +119,14 @@ earthEquationOfCenter earthSMA =
         c3 =
             0.0003
     in
-    degrees <|
-        (c1 * sin earthSMA)
-            + (c2 * sin (2 * earthSMA))
-            + (c3 * sin (3 * earthSMA))
+    degrees ((c1 * sin earthSMA) + (c2 * sin (2 * earthSMA)) + (c3 * sin (3 * earthSMA)))
 
 
 {-| Calculates [ecliptic](https://en.wikipedia.org/wiki/Ecliptic_coordinate_system) longitude for Earth
 -}
 earthEclipticLongitude : Float -> Float
 earthEclipticLongitude earthSMA =
-    earthSMA
-        + earthEquationOfCenter earthSMA
-        + earthPerihelion
-        + pi
+    earthSMA + earthEquationOfCenter earthSMA + earthPerihelion + pi
 
 
 {-| Geocentric ecliptic location of the Sun
@@ -184,8 +176,7 @@ sunTime time angle posix location height =
             -2.076 * sqrt height / 60
 
         julianCycle =
-            days
-                |> DaysSince2000.map (\ds -> toFloat (round (ds - j0 - latitude / (2 * pi))))
+            DaysSince2000.map (\ds -> toFloat (round (ds - j0 - latitude / (2 * pi)))) days
 
         approxTransit =
             computeApproxTransit 0 latitude julianCycle
@@ -206,8 +197,7 @@ sunTime time angle posix location height =
             degrees (angle + observerAngle)
 
         hourAngle =
-            acos
-                ((sin actualAngle - sin longitude * sin declination) / (cos longitude * cos declination))
+            acos ((sin actualAngle - sin longitude * sin declination) / (cos longitude * cos declination))
 
         set =
             solarTransit
@@ -226,14 +216,12 @@ sunTime time angle posix location height =
 
 solarTransit : DaysSince2000 -> Float -> Float -> DaysSince2000
 solarTransit days solarMeanAnomaly eclipticLongitude =
-    days
-        |> DaysSince2000.map (\ds -> ds + 0.0053 * sin solarMeanAnomaly - 0.0069 * sin (2 * eclipticLongitude))
+    DaysSince2000.map (\ds -> ds + 0.0053 * sin solarMeanAnomaly - 0.0069 * sin (2 * eclipticLongitude)) days
 
 
 computeApproxTransit : Float -> Float -> DaysSince2000 -> DaysSince2000
 computeApproxTransit hourAngle longitude julianCycle =
-    julianCycle
-        |> DaysSince2000.map (\ds -> j0 + (hourAngle + longitude) / (2 * pi) + ds)
+    DaysSince2000.map (\ds -> j0 + (hourAngle + longitude) / (2 * pi) + ds) julianCycle
 
 
 
@@ -674,14 +662,14 @@ toMoonTimes height midnight { riseOffset, setOffset } =
             else
                 AlwaysDown
 
-        ( Nothing, Just s ) ->
-            SetAt (addHours s midnight)
+        ( Nothing, Just set ) ->
+            SetAt (addHours set midnight)
 
-        ( Just r, Nothing ) ->
-            RiseAt (addHours r midnight)
+        ( Just rise, Nothing ) ->
+            RiseAt (addHours rise midnight)
 
-        ( Just r, Just s ) ->
-            RiseAndSetAt (addHours r midnight) (addHours s midnight)
+        ( Just rise, Just set ) ->
+            RiseAndSetAt (addHours rise midnight) (addHours set midnight)
 
 
 addHours : Float -> Time.Posix -> Time.Posix
@@ -700,9 +688,7 @@ addHours dt posix =
 -}
 earthDeclination : Float -> Float -> Float
 earthDeclination eclipticLongitude eclipticLatitude =
-    asin <|
-        (sin eclipticLatitude * cos earthObliquity)
-            + (cos eclipticLatitude * sin earthObliquity * sin eclipticLongitude)
+    asin ((sin eclipticLatitude * cos earthObliquity) + (cos eclipticLatitude * sin earthObliquity * sin eclipticLongitude))
 
 
 {-| Calculates [right ascension](https://en.wikipedia.org/wiki/Right_ascension) for Earth
@@ -736,9 +722,7 @@ azimuth hourAngle longitude declination =
 -}
 altitude : Float -> Float -> Float -> Float
 altitude hourAngle longitude declination =
-    asin <|
-        (sin longitude * sin declination)
-            + (cos longitude * cos declination * cos hourAngle)
+    asin ((sin longitude * sin declination) + (cos longitude * cos declination * cos hourAngle))
 
 
 
